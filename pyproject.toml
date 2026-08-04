@@ -1,0 +1,22 @@
+[project]
+name = "tony-shrimp-api"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "phamnguyen1700", email = "169217913+phamnguyen1700@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.141.1",
+    "uvicorn>=0.52.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "app"
+
+[project.scripts]
+dev = "app.main:run"
