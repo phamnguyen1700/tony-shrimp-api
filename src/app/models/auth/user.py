@@ -1,22 +1,21 @@
 import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from typing import TYPE_CHECKING
+from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.auth.session import Session
 
-from app.db.base import Base
-
 
 class UserRole(StrEnum):
     CUSTOMER = "customer"
-    SHOP_OWNER = "shop_owner"
+    OWNER = "owner"
     ADMIN = "admin"
 
 
