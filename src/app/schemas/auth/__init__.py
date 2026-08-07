@@ -1,5 +1,4 @@
-from app.schemas.auth import (
-    CurrentUserResponse,
+from app.schemas.auth.auth import (
     LogoutRequest,
     RefreshTokenRequest,
     OtpRequest,
@@ -7,6 +6,7 @@ from app.schemas.auth import (
     TokenResponse,
     VerifyOtpRequest,
 )
+from app.schemas.auth.user import CurrentUserResponse
 
 __all__ = [
     "CurrentUserResponse",

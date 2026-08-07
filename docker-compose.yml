@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: tony_shrimp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: tony_shrimp
+    ports:
+      - "5432:5432"
+    volumes:
+      - tony_shrimp_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: tony_shrimp_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - tony_shrimp_redis_data:/data
+
+volumes:
+  tony_shrimp_postgres_data:
+  tony_shrimp_redis_data:
