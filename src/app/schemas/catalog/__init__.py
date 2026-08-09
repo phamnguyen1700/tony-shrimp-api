@@ -1,38 +1,27 @@
-from app.schemas.auth import (
-    CurrentUserResponse,
-    LogoutRequest,
-    RefreshTokenRequest,
-    OtpRequest,
-    OtpResponse,
-    TokenResponse,
-    VerifyOtpRequest,
-)
-
-from app.schemas.catalog import (
+from app.schemas.catalog.care_parameter import (
     CareParameterCreate,
     CareParameterResponse,
     CareParameterUpdate,
-    CatalogOptionsResponse,
+)
+from app.schemas.catalog.options import CatalogOptionsResponse
+from app.schemas.catalog.shrimp import (
     ShrimpCreate,
     ShrimpDetailResponse,
+    ShrimpListItemResponse,
+    ShrimpUpdate,
+)
+from app.schemas.catalog.shrimp_image import (
     ShrimpImageCreate,
     ShrimpImageResponse,
     ShrimpImageUpdate,
-    ShrimpListItemResponse,
-    ShrimpUpdate,
+)
+from app.schemas.catalog.shrimp_variant import (
     ShrimpVariantCreate,
     ShrimpVariantResponse,
     ShrimpVariantUpdate,
 )
 
 __all__ = [
-    "CurrentUserResponse",
-    "LogoutRequest",
-    "RefreshTokenRequest",
-    "OtpRequest",
-    "OtpResponse",
-    "TokenResponse",
-    "VerifyOtpRequest",
     "CareParameterCreate",
     "CareParameterResponse",
     "CareParameterUpdate",

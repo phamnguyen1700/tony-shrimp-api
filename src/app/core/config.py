@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     otp_max_attempts: int = 5
     otp_request_cooldown_seconds: int = 30
 
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_bucket_name: str = "tony-shrimp-media"
+    r2_public_base_url: str = ""
+    r2_presigned_url_expire_seconds: int = 300
+
     cors_origins: str = (
         "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173"
     )
@@ -43,6 +50,13 @@ class Settings(BaseSettings):
         return [
             origin.strip() for origin in self.cors_origins.split(",") if origin.strip()
         ]
+
+    @property
+    def r2_endpoint_url(self) -> str:
+        if not self.r2_account_id:
+            return ""
+
+        return f"https://{self.r2_account_id}.r2.cloudflarestorage.com"
 
 
 @lru_cache
