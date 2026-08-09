@@ -71,6 +71,9 @@ instance/
 # Sphinx documentation
 docs/_build/
 
+# Local API notes/docs
+docs/
+
 # PyBuilder
 .pybuilder/
 target/
@@ -216,3 +219,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+#docs
+api.md

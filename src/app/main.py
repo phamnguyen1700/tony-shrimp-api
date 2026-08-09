@@ -1,9 +1,10 @@
 import uvicorn
 from fastapi import FastAPI
 
-import app
 from app.api.routes.health import router as health_router
 from app.api.routes.auth import router as auth_router
+from app.api.routes.catalog import router as catalog_router
+from app.api.routes.owner_catalog import router as owner_catalog_router
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -23,6 +24,8 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(catalog_router)
+    app.include_router(owner_catalog_router)
 
     return app
 
