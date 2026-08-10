@@ -1,4 +1,5 @@
 from functools import lru_cache
+from decimal import Decimal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -23,6 +24,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
+    access_token_cookie_name: str = "tony_access_token"
+    refresh_token_cookie_name: str = "tony_refresh_token"
+    auth_cookie_secure: bool = False
+    auth_cookie_samesite: str = "lax"
+    auth_cookie_domain: str | None = None
 
     email_provider: str = "dev"
     email_from: str = "phamnguyen1700@gmail.com"
@@ -40,6 +46,16 @@ class Settings(BaseSettings):
     r2_bucket_name: str = "tony-shrimp-media"
     r2_public_base_url: str = ""
     r2_presigned_url_expire_seconds: int = 300
+
+    pii_encryption_key: str = ""
+
+    australian_suburbs_lookup_suburb_url: str = (
+        "https://australiansuburbs.au/api/lookup_suburb"
+    )
+    australian_suburbs_validate_url: str = "https://australiansuburbs.au/api/validate"
+
+    order_shipping_flat_rate_amount: Decimal = Decimal("25.00")
+    order_currency: str = "AUD"
 
     cors_origins: str = (
         "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173"

@@ -30,6 +30,20 @@ from app.repositories.catalog import (
     update_shrimp_variant,
 )
 
+from app.repositories.user import (
+    count_user_addresses,
+    create_user_address,
+    create_user_profile,
+    delete_user_address,
+    get_or_create_user_profile,
+    get_user_address,
+    get_user_profile,
+    list_user_addresses,
+    set_user_address_as_default,
+    unset_default_user_addresses,
+    update_user_profile,
+)
+
 __all__ = [
     "create_session",
     "create_user",
@@ -58,4 +72,15 @@ __all__ = [
     "update_shrimp",
     "update_shrimp_image",
     "update_shrimp_variant",
+    "count_user_addresses",
+    "create_user_address",
+    "create_user_profile",
+    "delete_user_address",
+    "get_or_create_user_profile",
+    "get_user_address",
+    "get_user_profile",
+    "list_user_addresses",
+    "set_user_address_as_default",
+    "unset_default_user_addresses",
+    "update_user_profile",
 ]

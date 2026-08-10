@@ -11,12 +11,18 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.auth.session import Session
+    from app.models.user import UserAddress, UserProfile
 
 
 class UserRole(StrEnum):
     CUSTOMER = "customer"
     OWNER = "owner"
     ADMIN = "admin"
+
+
+class UserStatus(StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
 
 
 class User(Base):
@@ -38,6 +44,15 @@ class User(Base):
         nullable=False,
         default=UserRole.CUSTOMER.value,
     )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default=UserStatus.ACTIVE.value,
+    )
+    deactivated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -51,6 +66,15 @@ class User(Base):
     )
 
     sessions: Mapped[list["Session"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    profile: Mapped["UserProfile | None"] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    addresses: Mapped[list["UserAddress"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
