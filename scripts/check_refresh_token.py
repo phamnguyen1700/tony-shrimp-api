@@ -9,14 +9,14 @@ async def main() -> None:
     refresh_token = input("Enter refresh token: ").strip()
 
     async with AsyncSessionLocal() as db:
-        tokens = await refresh_access_token(
+        auth_response, access_token, refresh_token = await refresh_access_token(
             db,
             refresh_token=refresh_token,
         )
 
-    print(tokens.token_type)
-    print(tokens.access_token[:40])
-    print(tokens.refresh_token[:40])
+    print(auth_response.user.email, auth_response.user.role, auth_response.user.status)
+    print("Access cookie token prefix:", access_token[:24])
+    print("Refresh cookie token prefix:", refresh_token[:24])
 
 
 if __name__ == "__main__":

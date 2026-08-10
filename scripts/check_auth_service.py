@@ -14,7 +14,7 @@ async def main() -> None:
     code = input("Enter OTP from terminal log: ").strip()
 
     async with AsyncSessionLocal() as db:
-        tokens = await verify_otp_and_create_session(
+        auth_response, access_token, refresh_token = await verify_otp_and_create_session(
             db,
             redis_client,
             email=email,
@@ -23,9 +23,9 @@ async def main() -> None:
             user_agent="check_auth_service.py",
         )
 
-    print(tokens.token_type)
-    print(tokens.access_token[:40])
-    print(tokens.refresh_token[:40])
+    print(auth_response.user.email, auth_response.user.role, auth_response.user.status)
+    print("Access cookie token prefix:", access_token[:24])
+    print("Refresh cookie token prefix:", refresh_token[:24])
 
 
 if __name__ == "__main__":

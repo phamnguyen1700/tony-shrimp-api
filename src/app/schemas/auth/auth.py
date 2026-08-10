@@ -1,3 +1,6 @@
+import uuid
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -14,15 +17,22 @@ class VerifyOtpRequest(BaseModel):
     code: str = Field(min_length=6, max_length=6)
 
 
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
+class AuthUserResponse(BaseModel):
+    id: uuid.UUID
+    email: EmailStr
+    role: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AuthResponse(BaseModel):
+    user: AuthUserResponse
 
 
 class RefreshTokenRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None
 
 
 class LogoutRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None

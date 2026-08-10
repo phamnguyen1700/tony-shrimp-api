@@ -19,9 +19,11 @@ from app.repositories.auth import (
     update_session_last_used_at,
     revoke_session,
 )
+from app.models.auth import User
 from app.schemas.auth import (
+    AuthResponse,
+    AuthUserResponse,
     OtpResponse,
-    TokenResponse,
 )
 from app.services.auth.otp_service import create_otp, verify_otp
 from app.services.email import send_otp_email
@@ -29,6 +31,18 @@ from app.services.email import send_otp_email
 settings = get_settings()
 
 GENERIC_OTP_MESSAGE = "If the email is valid, a login code has been sent."
+AuthSessionResult = tuple[AuthResponse, str, str]
+
+
+def build_auth_user_response(user: User) -> AuthUserResponse:
+    return AuthUserResponse(
+        id=user.id,
+        email=user.email,
+        role=user.role,
+        status=user.status,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+    )
 
 
 async def request_otp(
@@ -54,7 +68,7 @@ async def verify_otp_and_create_session(
     code: str,
     ip_address: str | None = None,
     user_agent: str | None = None,
-) -> TokenResponse:
+) -> AuthSessionResult:
     normalized_email = normalize_email(email)
 
     is_valid = await verify_otp(redis, normalized_email, code)
@@ -88,17 +102,16 @@ async def verify_otp_and_create_session(
 
     await db.commit()
 
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    return AuthResponse(
+        user=build_auth_user_response(user),
+    ), access_token, refresh_token
 
 
 async def refresh_access_token(
     db: AsyncSession,
     *,
     refresh_token: str,
-) -> TokenResponse:
+) -> AuthSessionResult:
     refresh_token_lookup_hash = create_token_lookup_hash(refresh_token)
 
     session = await get_session_by_refresh_token_lookup_hash(
@@ -126,10 +139,9 @@ async def refresh_access_token(
     await update_session_last_used_at(db, session)
     await db.commit()
 
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    return AuthResponse(
+        user=build_auth_user_response(session.user),
+    ), access_token, refresh_token
 
 
 async def logout_session(

@@ -28,6 +28,17 @@ from app.services.catalog import (
     update_shrimp_catalog_item,
 )
 
+from app.services.user import (
+    create_current_user_address,
+    delete_current_user_address,
+    get_address_options,
+    get_current_user_profile_response,
+    list_current_user_addresses,
+    set_current_user_default_address,
+    update_current_user_address,
+    update_current_user_profile,
+)
+
 __all__ = [
     "create_otp",
     "generate_otp_code",
@@ -53,4 +64,12 @@ __all__ = [
     "to_shrimp_list_item_response",
     "upsert_shrimp_care_parameter",
     "update_shrimp_catalog_item",
+    "create_current_user_address",
+    "delete_current_user_address",
+    "get_address_options",
+    "get_current_user_profile_response",
+    "list_current_user_addresses",
+    "set_current_user_default_address",
+    "update_current_user_address",
+    "update_current_user_profile",
 ]
