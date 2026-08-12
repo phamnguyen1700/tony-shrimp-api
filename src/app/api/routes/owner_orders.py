@@ -10,13 +10,11 @@ from app.schemas.order import (
     OrderDetailResponse,
     OrderListResponse,
     UpdateOrderStatusRequest,
-    UpdateOrderTrackingRequest,
 )
 from app.services.order import (
     get_owner_order,
     list_owner_orders,
     update_owner_order_status,
-    update_owner_order_tracking,
 )
 
 router = APIRouter(prefix="/owner/orders", tags=["orders - owner"])
@@ -69,15 +67,3 @@ async def update_order_management_order_status(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-
-@router.patch("/{order_id}/tracking", response_model=OrderDetailResponse)
-async def update_order_management_order_tracking(
-    order_id: uuid.UUID,
-    payload: UpdateOrderTrackingRequest,
-    db: AsyncSession = Depends(get_db_session),
-    _: User = Depends(require_roles("owner", "admin")),
-) -> OrderDetailResponse:
-    try:
-        return await update_owner_order_tracking(db, order_id=order_id, payload=payload)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

@@ -12,7 +12,8 @@ async def create_shrimp(
     db: AsyncSession,
     *,
     name: str,
-    type: str,
+    slug: str,
+    line: str,
     species: str | None = None,
     colors: list[str] | None = None,
     grade: str | None = None,
@@ -23,8 +24,9 @@ async def create_shrimp(
 ) -> Shrimp:
     shrimp = Shrimp(
         name=name,
+        slug=slug,
         species=species,
-        type=type,
+        line=line,
         colors=colors or [],
         grade=grade,
         rarity=rarity,
@@ -53,12 +55,28 @@ async def get_shrimp_by_id(
     return result.scalar_one_or_none()
 
 
+async def get_shrimp_by_slug(
+    db: AsyncSession,
+    slug: str,
+) -> Shrimp | None:
+    result = await db.execute(
+        select(Shrimp)
+        .options(
+            selectinload(Shrimp.variants),
+            selectinload(Shrimp.care_parameter),
+            selectinload(Shrimp.images),
+        )
+        .where(Shrimp.slug == slug)
+    )
+    return result.scalar_one_or_none()
+
+
 async def list_shrimp(
     db: AsyncSession,
     *,
     catalog_status: str | None = None,
     search: str | None = None,
-    type: str | None = None,
+    line: str | None = None,
     color: str | None = None,
     grade: str | None = None,
     rarity: str | None = None,
@@ -79,8 +97,8 @@ async def list_shrimp(
         statement = statement.where(Shrimp.catalog_status == catalog_status)
     if search:
         statement = statement.where(Shrimp.name.ilike(f"%{search}%"))
-    if type is not None:
-        statement = statement.where(Shrimp.type == type)
+    if line is not None:
+        statement = statement.where(Shrimp.line == line)
     if color is not None:
         statement = statement.where(Shrimp.colors.contains([color]))
     if grade is not None:
@@ -114,8 +132,9 @@ async def update_shrimp(
     shrimp: Shrimp,
     *,
     name: str | None = None,
+    slug: str | None = None,
     species: str | None = None,
-    type: str | None = None,
+    line: str | None = None,
     colors: list[str] | None = None,
     grade: str | None = None,
     rarity: str | None = None,
@@ -125,10 +144,12 @@ async def update_shrimp(
 ) -> Shrimp:
     if name is not None:
         shrimp.name = name
+    if slug is not None:
+        shrimp.slug = slug
     if species is not None:
         shrimp.species = species
-    if type is not None:
-        shrimp.type = type
+    if line is not None:
+        shrimp.line = line
     if colors is not None:
         shrimp.colors = colors
     if grade is not None:

@@ -42,6 +42,7 @@ from app.schemas.user import (
 )
 from app.schemas.notification import NotificationListResponse, NotificationResponse
 from app.schemas.order import (
+    CheckoutOrderResponse,
     CreateOrderItemRequest,
     CreateOrderRequest,
     OrderAddressResponse,
@@ -51,7 +52,6 @@ from app.schemas.order import (
     OrderResponse,
     OrderStatusEventResponse,
     UpdateOrderStatusRequest,
-    UpdateOrderTrackingRequest,
 )
 
 __all__ = [
@@ -66,6 +66,7 @@ __all__ = [
     "CareParameterResponse",
     "CareParameterUpdate",
     "CatalogOptionsResponse",
+    "CheckoutOrderResponse",
     "CreateOrderItemRequest",
     "CreateOrderRequest",
     "NotificationListResponse",
@@ -96,7 +97,6 @@ __all__ = [
     "UpdateUserRoleRequest",
     "UpdateUserProfileRequest",
     "UpdateOrderStatusRequest",
-    "UpdateOrderTrackingRequest",
     "UserAddressCreate",
     "UserAddressResponse",
     "UserAddressUpdate",

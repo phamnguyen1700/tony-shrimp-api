@@ -23,6 +23,24 @@ class OrderStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class PaymentStatus(StrEnum):
+    PENDING = "pending"
+    PAID = "paid"
+    FAILED = "failed"
+    REFUNDED = "refunded"
+
+
+class PaymentProvider(StrEnum):
+    STRIPE = "stripe"
+
+
+class CancelledReason(StrEnum):
+    PAYMENT_TIMEOUT = "payment_timeout"
+    PAYMENT_FAILED = "payment_failed"
+    OWNER_CANCELLED = "owner_cancelled"
+    CUSTOMER_REQUEST = "customer_request"
+
+
 class Order(Base):
     __tablename__ = "orders"
 
@@ -67,6 +85,28 @@ class Order(Base):
         nullable=False,
         default="AUD",
     )
+    payment_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default=PaymentStatus.PENDING.value,
+        index=True,
+    )
+    payment_provider: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default=PaymentProvider.STRIPE.value,
+        index=True,
+    )
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        unique=True,
+    )
+    stripe_payment_intent_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+    )
     recipient_name: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
@@ -99,18 +139,6 @@ class Order(Base):
         Text,
         nullable=True,
     )
-    carrier: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
-    )
-    tracking_number: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
-    )
-    tracking_url: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -132,6 +160,18 @@ class Order(Base):
     )
     cancelled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
+        nullable=True,
+    )
+    paid_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    payment_failed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    cancelled_reason: Mapped[str | None] = mapped_column(
+        String(64),
         nullable=True,
     )
 

@@ -18,9 +18,9 @@ async def get_catalog_options(
         catalog_statuses=[status.value for status in CatalogStatus],
         care_levels=[care_level.value for care_level in CareLevel],
         sale_units=[sale_unit.value for sale_unit in SaleUnit],
-        types=await list_distinct_scalar_values(
+        lines=await list_distinct_scalar_values(
             db,
-            Shrimp.type,
+            Shrimp.line,
             active_only=active_only,
         ),
         colors=await list_distinct_array_values(

@@ -54,7 +54,7 @@ async def get_owner_catalog_options(
 async def list_owner_shrimp(
     catalog_status: CatalogStatus | None = Query(default=None),
     search: str | None = Query(default=None),
-    type: str | None = Query(default=None),
+    line: str | None = Query(default=None),
     color: str | None = Query(default=None),
     grade: str | None = Query(default=None),
     rarity: str | None = Query(default=None),
@@ -71,7 +71,7 @@ async def list_owner_shrimp(
         db,
         catalog_status=catalog_status.value if catalog_status else None,
         search=search,
-        type=type,
+        line=line,
         color=color,
         grade=grade,
         rarity=rarity,

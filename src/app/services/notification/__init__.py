@@ -4,6 +4,7 @@ from app.services.notification.notification_service import (
     list_owner_notifications,
     mark_owner_all_notifications_read,
     mark_owner_notification_read,
+    publish_notifications,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "list_owner_notifications",
     "mark_owner_all_notifications_read",
     "mark_owner_notification_read",
+    "publish_notifications",
 ]

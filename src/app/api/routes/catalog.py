@@ -30,7 +30,7 @@ async def get_public_catalog_options(
 @router.get("/shrimp", response_model=list[ShrimpListItemResponse])
 async def list_shrimp(
     search: str | None = Query(default=None),
-    type: str | None = Query(default=None),
+    line: str | None = Query(default=None),
     color: str | None = Query(default=None),
     grade: str | None = Query(default=None),
     rarity: str | None = Query(default=None),
@@ -46,7 +46,7 @@ async def list_shrimp(
         db,
         catalog_status=CatalogStatus.ACTIVE.value,
         search=search,
-        type=type,
+        line=line,
         color=color,
         grade=grade,
         rarity=rarity,

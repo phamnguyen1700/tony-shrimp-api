@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
-from app.models.order import OrderStatus
+from app.models.order import PaymentProvider, PaymentStatus, OrderStatus
 
 
 class CreateOrderItemRequest(BaseModel):
@@ -56,19 +56,21 @@ class OrderResponse(BaseModel):
     order_number: str
     user_id: uuid.UUID
     status: str
+    payment_status: str
+    payment_provider: str
     subtotal_amount: Decimal
     shipping_amount: Decimal
     total_amount: Decimal
     currency: str
     customer_note: str | None
-    carrier: str | None
-    tracking_number: str | None
-    tracking_url: str | None
     created_at: datetime
     updated_at: datetime
     shipped_at: datetime | None
     delivered_at: datetime | None
     cancelled_at: datetime | None
+    paid_at: datetime | None
+    payment_failed_at: datetime | None
+    cancelled_reason: str | None
 
 
 class OrderDetailResponse(OrderResponse):
@@ -84,13 +86,17 @@ class OrderListResponse(BaseModel):
     offset: int
 
 
+class CheckoutOrderResponse(BaseModel):
+    order: OrderDetailResponse
+    checkout_url: str
+    stripe_session_id: str
+    payment_status: PaymentStatus = PaymentStatus.PENDING
+    payment_provider: PaymentProvider = PaymentProvider.STRIPE
+
+
 class UpdateOrderStatusRequest(BaseModel):
     status: OrderStatus
     message: str | None = Field(default=None, max_length=1000)
     status_at: datetime | None = None
 
 
-class UpdateOrderTrackingRequest(BaseModel):
-    carrier: str | None = Field(default=None, max_length=100)
-    tracking_number: str | None = Field(default=None, max_length=100)
-    tracking_url: str | None = Field(default=None, max_length=1000)

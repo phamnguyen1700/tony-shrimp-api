@@ -1,4 +1,5 @@
 from app.schemas.order.order import (
+    CheckoutOrderResponse,
     CreateOrderItemRequest,
     CreateOrderRequest,
     OrderAddressResponse,
@@ -8,10 +9,10 @@ from app.schemas.order.order import (
     OrderResponse,
     OrderStatusEventResponse,
     UpdateOrderStatusRequest,
-    UpdateOrderTrackingRequest,
 )
 
 __all__ = [
+    "CheckoutOrderResponse",
     "CreateOrderItemRequest",
     "CreateOrderRequest",
     "OrderAddressResponse",
@@ -21,5 +22,4 @@ __all__ = [
     "OrderResponse",
     "OrderStatusEventResponse",
     "UpdateOrderStatusRequest",
-    "UpdateOrderTrackingRequest",
 ]

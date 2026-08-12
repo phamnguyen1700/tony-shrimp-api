@@ -18,8 +18,14 @@ from app.schemas.catalog.shrimp_variant import (
 
 class ShrimpCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+    slug: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
     species: str | None = Field(default=None, max_length=255)
-    type: str = Field(min_length=1, max_length=64)
+    line: str = Field(min_length=1, max_length=64)
     colors: list[str] = Field(default_factory=list, max_length=10)
     grade: str | None = Field(default=None, max_length=64)
     rarity: str | None = Field(default=None, max_length=64)
@@ -34,8 +40,14 @@ class ShrimpCreate(BaseModel):
 
 class ShrimpUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
+    slug: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
     species: str | None = Field(default=None, max_length=255)
-    type: str | None = Field(default=None, min_length=1, max_length=64)
+    line: str | None = Field(default=None, min_length=1, max_length=64)
     colors: list[str] | None = Field(default=None, max_length=10)
     grade: str | None = Field(default=None, max_length=64)
     rarity: str | None = Field(default=None, max_length=64)
@@ -47,8 +59,9 @@ class ShrimpUpdate(BaseModel):
 class ShrimpListItemResponse(BaseModel):
     id: uuid.UUID
     name: str
+    slug: str
     species: str | None
-    type: str
+    line: str
     colors: list[str]
     grade: str | None
     rarity: str | None
@@ -66,8 +79,9 @@ class ShrimpListItemResponse(BaseModel):
 class ShrimpDetailResponse(BaseModel):
     id: uuid.UUID
     name: str
+    slug: str
     species: str | None
-    type: str
+    line: str
     colors: list[str]
     grade: str | None
     rarity: str | None

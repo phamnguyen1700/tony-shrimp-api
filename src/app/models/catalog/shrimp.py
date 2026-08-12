@@ -33,11 +33,17 @@ class Shrimp(Base):
         nullable=False,
         index=True,
     )
+    slug: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
     species: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
     )
-    type: Mapped[str] = mapped_column(
+    line: Mapped[str] = mapped_column(
         String(64),
         nullable=False,
     )
