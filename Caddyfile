@@ -1,0 +1,19 @@
+api.tonyshrimp.com.au {
+    encode gzip
+
+    reverse_proxy api:8000
+}
+
+pgadmin.tonyshrimp.com.au {
+    encode gzip
+
+    header {
+        X-Robots-Tag "noindex, nofollow"
+    }
+
+    basicauth {
+        {$PGADMIN_BASIC_AUTH_USER} {$PGADMIN_BASIC_AUTH_HASH}
+    }
+
+    reverse_proxy pgadmin:80
+}
