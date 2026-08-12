@@ -36,4 +36,19 @@ jobs:
           docker compose -f docker-compose.prod.yml up -d --build
           docker compose -f docker-compose.prod.yml exec -T api uv run alembic upgrade head
 
-          curl -fsS https://api.tonyshrimp.com.au/health/
+          docker compose -f docker-compose.prod.yml exec -T api uv run python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health/').read().decode())"
+
+          for attempt in $(seq 1 12); do
+            if curl -fsS https://api.tonyshrimp.com.au/health/; then
+              exit 0
+            fi
+
+            echo "Health check failed, retrying in 5s... ($attempt/12)"
+            sleep 5
+          done
+
+          echo "API health check failed after retries."
+          docker compose -f docker-compose.prod.yml ps
+          docker compose -f docker-compose.prod.yml logs --tail=120 api
+          docker compose -f docker-compose.prod.yml logs --tail=120 caddy
+          exit 1
