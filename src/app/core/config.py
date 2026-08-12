@@ -58,6 +58,15 @@ class Settings(BaseSettings):
     order_shipping_flat_rate_amount: Decimal = Decimal("25.00")
     order_currency: str = "AUD"
 
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_currency: str = "aud"
+    stripe_success_url: str = (
+        "https://tonyshrimp.com.au/orders/success?session_id={CHECKOUT_SESSION_ID}"
+    )
+    stripe_cancel_url: str = "https://tonyshrimp.com.au/cart"
+    stripe_checkout_expires_after_minutes: int = 6
+
     cors_origins: str = (
         "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://tonyshrimp.com.au"
     )

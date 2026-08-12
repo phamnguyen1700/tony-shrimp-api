@@ -8,18 +8,31 @@ from app.models.catalog import (
     ShrimpVariant,
 )
 from app.models.notification import Notification, NotificationType
-from app.models.order import Order, OrderItem, OrderStatus, OrderStatusEvent
+from app.models.order import (
+    CancelledReason,
+    Order,
+    OrderItem,
+    OrderStatus,
+    OrderStatusEvent,
+    PaymentProvider,
+    PaymentStatus,
+)
+from app.models.payment import PaymentEvent
 from app.models.user import UserAddress, UserProfile
 
 __all__ = [
     "CareParameter",
     "CatalogStatus",
+    "CancelledReason",
     "Notification",
     "NotificationType",
     "Order",
     "OrderItem",
     "OrderStatus",
     "OrderStatusEvent",
+    "PaymentEvent",
+    "PaymentProvider",
+    "PaymentStatus",
     "SaleUnit",
     "Session",
     "Shrimp",

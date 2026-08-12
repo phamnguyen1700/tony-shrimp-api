@@ -8,7 +8,6 @@ from app.schemas.order import (
     CreateOrderItemRequest,
     CreateOrderRequest,
     UpdateOrderStatusRequest,
-    UpdateOrderTrackingRequest,
 )
 
 
@@ -43,9 +42,3 @@ def test_update_order_status_accepts_supported_status() -> None:
 
     assert request.status == OrderStatus.SHIPPED
 
-
-def test_update_order_tracking_allows_partial_payload() -> None:
-    request = UpdateOrderTrackingRequest(tracking_number="EX123456789AU")
-
-    assert request.tracking_number == "EX123456789AU"
-    assert request.carrier is None

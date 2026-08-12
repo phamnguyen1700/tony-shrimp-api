@@ -9,6 +9,7 @@ from app.api.routes.owner_catalog import router as owner_catalog_router
 from app.api.routes.owner_notifications import router as owner_notifications_router
 from app.api.routes.owner_orders import router as owner_orders_router
 from app.api.routes.owner_users import router as owner_users_router
+from app.api.routes.stripe_webhooks import router as stripe_webhooks_router
 from app.api.routes.user import router as user_router
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +36,7 @@ def create_app() -> FastAPI:
     app.include_router(owner_notifications_router)
     app.include_router(owner_orders_router)
     app.include_router(owner_users_router)
+    app.include_router(stripe_webhooks_router)
     app.include_router(user_router)
 
     return app

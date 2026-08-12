@@ -5,7 +5,6 @@ from app.services.order.order_service import (
     list_customer_orders,
     list_owner_orders,
     update_owner_order_status,
-    update_owner_order_tracking,
 )
 
 __all__ = [
@@ -15,5 +14,4 @@ __all__ = [
     "list_customer_orders",
     "list_owner_orders",
     "update_owner_order_status",
-    "update_owner_order_tracking",
 ]

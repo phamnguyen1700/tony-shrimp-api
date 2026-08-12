@@ -18,6 +18,7 @@ from app.repositories.catalog.shrimp_repository import (
     create_shrimp,
     delete_shrimp,
     get_shrimp_by_id,
+    get_shrimp_by_slug,
     list_shrimp,
     update_shrimp,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "delete_shrimp_variant",
     "get_care_parameter_by_shrimp_id",
     "get_shrimp_by_id",
+    "get_shrimp_by_slug",
     "get_shrimp_image_by_id",
     "get_shrimp_variant_by_id",
     "list_distinct_array_values",

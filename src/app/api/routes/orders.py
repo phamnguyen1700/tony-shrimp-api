@@ -5,7 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user, get_db_session
 from app.models.auth import User
-from app.schemas.order import CreateOrderRequest, OrderDetailResponse, OrderListResponse
+from app.schemas.order import (
+    CheckoutOrderResponse,
+    CreateOrderRequest,
+    OrderDetailResponse,
+    OrderListResponse,
+)
 from app.services.order import (
     create_customer_order,
     get_customer_order,
@@ -15,16 +20,20 @@ from app.services.order import (
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
-@router.post("", response_model=OrderDetailResponse, status_code=status.HTTP_201_CREATED)
-async def create_order(
+@router.post(
+    "/checkout",
+    response_model=CheckoutOrderResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_order_checkout(
     payload: CreateOrderRequest,
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> OrderDetailResponse:
+) -> CheckoutOrderResponse:
     try:
         return await create_customer_order(
             db,
-            user_id=current_user.id,
+            current_user=current_user,
             payload=payload,
         )
     except ValueError as exc:

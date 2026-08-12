@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, or_, select
@@ -43,8 +43,10 @@ async def create_order(
     state: str,
     postcode: str,
     customer_note: str | None,
+    payment_status: str | None = None,
+    payment_provider: str | None = None,
 ) -> Order:
-    order = Order(
+    values = dict(
         order_number=order_number,
         user_id=user_id,
         status=status,
@@ -61,6 +63,12 @@ async def create_order(
         postcode=postcode,
         customer_note=customer_note,
     )
+    if payment_status is not None:
+        values["payment_status"] = payment_status
+    if payment_provider is not None:
+        values["payment_provider"] = payment_provider
+
+    order = Order(**values)
     db.add(order)
     await db.flush()
     return order
@@ -141,6 +149,73 @@ async def get_order_by_order_number(
 ) -> Order | None:
     result = await db.execute(select(Order).where(Order.order_number == order_number))
     return result.scalar_one_or_none()
+
+
+async def get_order_by_stripe_checkout_session_id(
+    db: AsyncSession,
+    stripe_checkout_session_id: str,
+) -> Order | None:
+    result = await db.execute(
+        select(Order)
+        .options(selectinload(Order.items), selectinload(Order.status_events))
+        .where(Order.stripe_checkout_session_id == stripe_checkout_session_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_order_by_stripe_payment_intent_id(
+    db: AsyncSession,
+    stripe_payment_intent_id: str,
+) -> Order | None:
+    result = await db.execute(
+        select(Order)
+        .options(selectinload(Order.items), selectinload(Order.status_events))
+        .where(Order.stripe_payment_intent_id == stripe_payment_intent_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def update_order_payment_fields(
+    db: AsyncSession,
+    order: Order,
+    *,
+    payment_status: str | None = None,
+    stripe_checkout_session_id: str | None = None,
+    stripe_payment_intent_id: str | None = None,
+    paid_at: datetime | None = None,
+    payment_failed_at: datetime | None = None,
+    cancelled_reason: str | None = None,
+) -> Order:
+    if payment_status is not None:
+        order.payment_status = payment_status
+    if stripe_checkout_session_id is not None:
+        order.stripe_checkout_session_id = stripe_checkout_session_id
+    if stripe_payment_intent_id is not None:
+        order.stripe_payment_intent_id = stripe_payment_intent_id
+    if paid_at is not None:
+        order.paid_at = paid_at
+    if payment_failed_at is not None:
+        order.payment_failed_at = payment_failed_at
+    if cancelled_reason is not None:
+        order.cancelled_reason = cancelled_reason
+
+    await db.flush()
+    return order
+
+
+async def list_pending_payment_orders_older_than(
+    db: AsyncSession,
+    *,
+    minutes: int,
+) -> list[Order]:
+    cutoff = datetime.now(UTC) - timedelta(minutes=minutes)
+    result = await db.execute(
+        select(Order).where(
+            Order.payment_status == "pending",
+            Order.created_at <= cutoff,
+        )
+    )
+    return list(result.scalars().all())
 
 
 def build_order_filters(

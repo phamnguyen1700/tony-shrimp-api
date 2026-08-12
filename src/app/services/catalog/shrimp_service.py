@@ -1,4 +1,5 @@
 import uuid
+import re
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,7 @@ from app.repositories.catalog import (
     create_shrimp_variant,
     delete_shrimp,
     get_shrimp_by_id,
+    get_shrimp_by_slug,
     list_shrimp,
     update_shrimp,
 )
@@ -66,12 +68,38 @@ def get_care_level(shrimp: Shrimp) -> str | None:
     return shrimp.care_parameter.care_level
 
 
+def normalize_slug(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
+    slug = re.sub(r"-+", "-", slug).strip("-")
+    return slug or "shrimp"
+
+
+async def create_unique_shrimp_slug(
+    db: AsyncSession,
+    value: str,
+    *,
+    current_shrimp_id: uuid.UUID | None = None,
+) -> str:
+    base_slug = normalize_slug(value)
+    candidate = base_slug
+    suffix = 2
+
+    while True:
+        existing = await get_shrimp_by_slug(db, candidate)
+        if existing is None or existing.id == current_shrimp_id:
+            return candidate
+
+        candidate = f"{base_slug}-{suffix}"
+        suffix += 1
+
+
 def to_shrimp_list_item_response(shrimp: Shrimp) -> ShrimpListItemResponse:
     return ShrimpListItemResponse(
         id=shrimp.id,
         name=shrimp.name,
+        slug=shrimp.slug,
         species=shrimp.species,
-        type=shrimp.type,
+        line=shrimp.line,
         colors=shrimp.colors,
         grade=shrimp.grade,
         rarity=shrimp.rarity,
@@ -93,8 +121,9 @@ def to_shrimp_detail_response(shrimp: Shrimp) -> ShrimpDetailResponse:
     return ShrimpDetailResponse(
         id=shrimp.id,
         name=shrimp.name,
+        slug=shrimp.slug,
         species=shrimp.species,
-        type=shrimp.type,
+        line=shrimp.line,
         colors=shrimp.colors,
         grade=shrimp.grade,
         rarity=shrimp.rarity,
@@ -161,8 +190,9 @@ async def create_shrimp_catalog_item(
     shrimp = await create_shrimp(
         db,
         name=payload.name,
+        slug=await create_unique_shrimp_slug(db, payload.slug or payload.name),
         species=payload.species,
-        type=payload.type,
+        line=payload.line,
         colors=payload.colors,
         grade=payload.grade,
         rarity=payload.rarity,
@@ -240,7 +270,7 @@ async def list_shrimp_catalog_items(
     *,
     catalog_status: str | None = None,
     search: str | None = None,
-    type: str | None = None,
+    line: str | None = None,
     color: str | None = None,
     grade: str | None = None,
     rarity: str | None = None,
@@ -255,7 +285,7 @@ async def list_shrimp_catalog_items(
         db,
         catalog_status=catalog_status,
         search=search,
-        type=type,
+        line=line,
         color=color,
         grade=grade,
         rarity=rarity,
@@ -283,8 +313,17 @@ async def update_shrimp_catalog_item(
         db,
         shrimp,
         name=payload.name,
+        slug=(
+            await create_unique_shrimp_slug(
+                db,
+                payload.slug,
+                current_shrimp_id=shrimp.id,
+            )
+            if payload.slug is not None
+            else None
+        ),
         species=payload.species,
-        type=payload.type,
+        line=payload.line,
         colors=payload.colors,
         grade=payload.grade,
         rarity=payload.rarity,

@@ -15,7 +15,7 @@ from app.schemas.catalog import (
 
 
 def test_shrimp_create_defaults_to_inactive_catalog_status() -> None:
-    shrimp = ShrimpCreate(name="Red Boa", type="Caridina")
+    shrimp = ShrimpCreate(name="Red Boa", line="Caridina")
 
     assert shrimp.catalog_status == CatalogStatus.INACTIVE
     assert shrimp.colors == []
@@ -29,14 +29,14 @@ def test_shrimp_create_limits_images_to_four() -> None:
     ]
 
     with pytest.raises(ValidationError):
-        ShrimpCreate(name="Red Boa", type="Caridina", images=images)
+        ShrimpCreate(name="Red Boa", line="Caridina", images=images)
 
 
 def test_shrimp_create_limits_colors_to_ten() -> None:
     with pytest.raises(ValidationError):
         ShrimpCreate(
             name="Red Boa",
-            type="Caridina",
+            line="Caridina",
             colors=[f"color-{index}" for index in range(11)],
         )
 

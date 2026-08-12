@@ -7,10 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.pii import decrypt_pii
-from app.models.auth import UserRole
+from app.models.auth import User
 from app.models.catalog import CatalogStatus, ShrimpImage, ShrimpVariant
-from app.models.notification import NotificationType
-from app.models.order import Order, OrderStatus
+from app.models.order import Order, OrderStatus, PaymentProvider, PaymentStatus
 from app.repositories.order import (
     count_orders,
     create_order,
@@ -20,9 +19,11 @@ from app.repositories.order import (
     get_order_by_order_number,
     get_variant_for_order,
     list_orders,
+    update_order_payment_fields,
 )
 from app.repositories.user import get_user_address
 from app.schemas.order import (
+    CheckoutOrderResponse,
     CreateOrderRequest,
     OrderAddressResponse,
     OrderDetailResponse,
@@ -31,12 +32,8 @@ from app.schemas.order import (
     OrderResponse,
     OrderStatusEventResponse,
     UpdateOrderStatusRequest,
-    UpdateOrderTrackingRequest,
 )
-from app.services.notification.notification_service import (
-    create_notification_for_audience,
-    publish_notifications,
-)
+from app.services.payment import create_order_checkout_session
 
 settings = get_settings()
 
@@ -97,19 +94,21 @@ def build_order_response(order: Order) -> OrderResponse:
         order_number=order.order_number,
         user_id=order.user_id,
         status=order.status,
+        payment_status=order.payment_status,
+        payment_provider=order.payment_provider,
         subtotal_amount=order.subtotal_amount,
         shipping_amount=order.shipping_amount,
         total_amount=order.total_amount,
         currency=order.currency,
         customer_note=order.customer_note,
-        carrier=order.carrier,
-        tracking_number=order.tracking_number,
-        tracking_url=order.tracking_url,
         created_at=order.created_at,
         updated_at=order.updated_at,
         shipped_at=order.shipped_at,
         delivered_at=order.delivered_at,
         cancelled_at=order.cancelled_at,
+        paid_at=order.paid_at,
+        payment_failed_at=order.payment_failed_at,
+        cancelled_reason=order.cancelled_reason,
     )
 
 
@@ -158,12 +157,12 @@ def aggregate_order_items(payload: CreateOrderRequest) -> dict[uuid.UUID, int]:
 async def create_customer_order(
     db: AsyncSession,
     *,
-    user_id: uuid.UUID,
+    current_user: User,
     payload: CreateOrderRequest,
-) -> OrderDetailResponse:
+) -> CheckoutOrderResponse:
     address = await get_user_address(
         db,
-        user_id=user_id,
+        user_id=current_user.id,
         address_id=payload.shipping_address_id,
     )
     if address is None:
@@ -191,8 +190,10 @@ async def create_customer_order(
     order = await create_order(
         db,
         order_number=order_number,
-        user_id=user_id,
+        user_id=current_user.id,
         status=OrderStatus.PROCESSING.value,
+        payment_status=PaymentStatus.PENDING.value,
+        payment_provider=PaymentProvider.STRIPE.value,
         subtotal_amount=subtotal,
         shipping_amount=shipping_amount,
         total_amount=total,
@@ -227,35 +228,39 @@ async def create_customer_order(
         db,
         order_id=order.id,
         status=OrderStatus.PROCESSING.value,
-        message="Order received.",
-        created_by_user_id=user_id,
+        message="Checkout created.",
+        created_by_user_id=current_user.id,
         created_at=order.created_at,
     )
-
-    notifications = []
-    for role in (UserRole.OWNER.value, UserRole.ADMIN.value):
-        notifications.append(
-            await create_notification_for_audience(
-                db,
-                recipient_role=role,
-                type=NotificationType.NEW_ORDER.value,
-                title=f"New order {order.order_number}",
-                message="A new COD order has been placed.",
-                data={
-                    "order_id": str(order.id),
-                    "order_number": order.order_number,
-                },
-            )
-        )
-
-    await db.commit()
-    await publish_notifications(notifications)
 
     refreshed_order = await get_order_by_id(db, order.id)
     if refreshed_order is None:
         raise RuntimeError("Created order could not be loaded.")
 
-    return build_order_detail_response(refreshed_order)
+    checkout_session = create_order_checkout_session(
+        order=refreshed_order,
+        customer_email=current_user.email,
+    )
+    checkout_url = checkout_session.get("url")
+    if not checkout_url:
+        raise RuntimeError("Stripe checkout session did not return a URL.")
+
+    await update_order_payment_fields(
+        db,
+        refreshed_order,
+        stripe_checkout_session_id=str(checkout_session["id"]),
+    )
+    await db.commit()
+
+    created = await get_order_by_id(db, order.id)
+    if created is None:
+        raise RuntimeError("Created order could not be loaded.")
+
+    return CheckoutOrderResponse(
+        order=build_order_detail_response(created),
+        checkout_url=str(checkout_url),
+        stripe_session_id=str(checkout_session["id"]),
+    )
 
 
 async def list_customer_orders(
@@ -361,27 +366,3 @@ async def update_owner_order_status(
 
     return build_order_detail_response(refreshed_order)
 
-
-async def update_owner_order_tracking(
-    db: AsyncSession,
-    *,
-    order_id: uuid.UUID,
-    payload: UpdateOrderTrackingRequest,
-) -> OrderDetailResponse:
-    order = await get_order_by_id(db, order_id)
-    if order is None:
-        raise ValueError("Order not found.")
-
-    if "carrier" in payload.model_fields_set:
-        order.carrier = normalize_note(payload.carrier)
-    if "tracking_number" in payload.model_fields_set:
-        order.tracking_number = normalize_note(payload.tracking_number)
-    if "tracking_url" in payload.model_fields_set:
-        order.tracking_url = normalize_note(payload.tracking_url)
-
-    await db.commit()
-    refreshed_order = await get_order_by_id(db, order.id)
-    if refreshed_order is None:
-        raise RuntimeError("Updated order could not be loaded.")
-
-    return build_order_detail_response(refreshed_order)
