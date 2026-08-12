@@ -30,5 +30,14 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = "app"
 
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
 [project.scripts]
 dev = "app.main:run"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
