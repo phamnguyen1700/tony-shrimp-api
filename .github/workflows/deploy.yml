@@ -1,0 +1,39 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on:
+      - self-hosted
+      - tony-shrimp-api
+      - prod
+
+    steps:
+      - name: Deploy on VPS
+        run: |
+          set -euo pipefail
+
+          cd /opt/tony-shrimp/tony-shrimp-api
+          git fetch origin main
+          git pull --ff-only origin main
+
+          docker compose -f docker-compose.prod.yml up -d --build
+          docker compose -f docker-compose.prod.yml exec -T api uv run alembic upgrade head
+
+          curl -fsS https://api.tonyshrimp.com.au/health/

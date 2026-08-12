@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Compile Python modules
+        run: uv run python -m compileall src/app alembic
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Create CI compose env
+        run: |
+          cat > .env <<'EOF'
+          APP_NAME=Tony Shrimp API
+          ENVIRONMENT=ci
+          DATABASE_URL=postgresql+psycopg://admin:admin@postgres:5432/tony_shrimp
+          REDIS_URL=redis://redis:6379/0
+          JWT_SECRET_KEY=ci-jwt-secret-key-with-at-least-32-bytes
+          JWT_ALGORITHM=HS256
+          ACCESS_TOKEN_EXPIRE_MINUTES=15
+          REFRESH_TOKEN_EXPIRE_DAYS=7
+          ACCESS_TOKEN_COOKIE_NAME=tony_access_token
+          REFRESH_TOKEN_COOKIE_NAME=tony_refresh_token
+          AUTH_COOKIE_SECURE=true
+          AUTH_COOKIE_SAMESITE=none
+          AUTH_COOKIE_DOMAIN=.tonyshrimp.com.au
+          EMAIL_PROVIDER=dev
+          EMAIL_FROM=no-reply@tonyshrimp.com.au
+          EMAIL_LOGO_URL=
+          RESEND_API_KEY=
+          RESEND_API_URL=https://api.resend.com/emails
+          OTP_EXPIRE_MINUTES=5
+          OTP_MAX_ATTEMPTS=5
+          OTP_REQUEST_COOLDOWN_SECONDS=30
+          R2_ACCOUNT_ID=
+          R2_ACCESS_KEY_ID=
+          R2_SECRET_ACCESS_KEY=
+          R2_BUCKET_NAME=tony-shrimp-media
+          R2_PUBLIC_BASE_URL=
+          R2_PRESIGNED_URL_EXPIRE_SECONDS=300
+          PII_ENCRYPTION_KEY=
+          AUSTRALIAN_SUBURBS_LOOKUP_SUBURB_URL=https://australiansuburbs.au/api/lookup_suburb
+          AUSTRALIAN_SUBURBS_VALIDATE_URL=https://australiansuburbs.au/api/validate
+          POSTGRES_USER=admin
+          POSTGRES_PASSWORD=admin
+          POSTGRES_DB=tony_shrimp
+          CORS_ORIGINS=https://tonyshrimp.com.au
+          PGADMIN_DEFAULT_EMAIL=admin@example.com
+          PGADMIN_DEFAULT_PASSWORD=admin
+          PGADMIN_BASIC_AUTH_USER=admin
+          PGADMIN_BASIC_AUTH_HASH='$2a$14$3iM8ADaFlxDUyKoKNmKF.uZp/ytmGHSwU30h5Kt.uwHFxYjxwVFia'
+          ORDER_SHIPPING_FLAT_RATE_AMOUNT=25.00
+          ORDER_CURRENCY=AUD
+          EOF
+
+      - name: Validate Docker Compose config
+        run: docker compose -f docker-compose.prod.yml config
+
+      - name: Build production image
+        run: docker compose -f docker-compose.prod.yml build api
