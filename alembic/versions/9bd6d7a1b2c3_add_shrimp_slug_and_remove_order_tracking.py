@@ -66,10 +66,10 @@ def upgrade() -> None:
     op.alter_column("shrimp", "slug", nullable=False)
     op.create_index(op.f("ix_shrimp_slug"), "shrimp", ["slug"], unique=True)
 
-    op.drop_column("orders", "admin_note")
-    op.drop_column("orders", "carrier")
-    op.drop_column("orders", "tracking_number")
-    op.drop_column("orders", "tracking_url")
+    op.execute("ALTER TABLE orders DROP COLUMN IF EXISTS admin_note")
+    op.execute("ALTER TABLE orders DROP COLUMN IF EXISTS carrier")
+    op.execute("ALTER TABLE orders DROP COLUMN IF EXISTS tracking_number")
+    op.execute("ALTER TABLE orders DROP COLUMN IF EXISTS tracking_url")
 
 
 def downgrade() -> None:
