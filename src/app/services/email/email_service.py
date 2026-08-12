@@ -49,7 +49,7 @@ def build_otp_email_html(code: str) -> str:
                         Tony Shrimp
                       </div>
                       <div style="margin-top:4px;font-size:11px;letter-spacing:5px;text-transform:uppercase;color:#6f6a60;">
-                        Australia
+                        Australia Aquarium Shrimp
                       </div>
                     </td>
                   </tr>
