@@ -2,16 +2,16 @@
 .gitignore
 
 .env
-.env.*
+.env.\*
 !.env.example
 
 .venv
 env
 venv
-__pycache__
-*.py[cod]
-*.pyo
-*.pyd
+**pycache**
+_.py[cod]
+_.pyo
+\*.pyd
 
 .pytest_cache
 .ruff_cache
@@ -22,14 +22,14 @@ htmlcov
 
 build
 dist
-*.egg-info
+\*.egg-info
 
 docs
 api.md
 
-*.log
-*.sqlite3
-*.db
+_.log
+_.sqlite3
+\*.db
 
 .idea
 .vscode

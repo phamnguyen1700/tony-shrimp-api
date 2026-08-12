@@ -1,0 +1,74 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tony_shrimp_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+    expose:
+      - "8000"
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: tony_shrimp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - tony_shrimp_postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: tony_shrimp_redis
+    restart: unless-stopped
+    volumes:
+      - tony_shrimp_redis_data:/data
+    expose:
+      - "6379"
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: tony_shrimp_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    depends_on:
+      - postgres
+    expose:
+      - "80"
+    volumes:
+      - tony_shrimp_pgadmin_data:/var/lib/pgadmin
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: tony_shrimp_caddy
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - api
+      - pgadmin
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - tony_shrimp_caddy_data:/data
+      - tony_shrimp_caddy_config:/config
+
+volumes:
+  tony_shrimp_postgres_data:
+  tony_shrimp_redis_data:
+  tony_shrimp_pgadmin_data:
+  tony_shrimp_caddy_data:
+  tony_shrimp_caddy_config:

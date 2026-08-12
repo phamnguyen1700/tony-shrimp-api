@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     email_provider: str = "dev"
     email_from: str = "phamnguyen1700@gmail.com"
     # email_from: str = "no-reply@tonyshrimp.local"
+    email_logo_url: str = ""
     resend_api_key: str = ""
     resend_api_url: str = "https://api.resend.com/emails"
 
