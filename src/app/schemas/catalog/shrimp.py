@@ -65,6 +65,7 @@ class ShrimpListItemResponse(BaseModel):
     colors: list[str]
     grade: str | None
     rarity: str | None
+    description: str | None
     catalog_status: str
     traits: list[str]
     created_at: datetime

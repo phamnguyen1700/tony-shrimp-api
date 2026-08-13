@@ -1,4 +1,6 @@
+from datetime import UTC, datetime
 from decimal import Decimal
+import uuid
 
 import pytest
 from pydantic import ValidationError
@@ -10,6 +12,7 @@ from app.schemas.catalog import (
     CareParameterCreate,
     ShrimpCreate,
     ShrimpImageCreate,
+    ShrimpListItemResponse,
     ShrimpVariantCreate,
 )
 
@@ -39,6 +42,37 @@ def test_shrimp_create_limits_colors_to_ten() -> None:
             line="Caridina",
             colors=[f"color-{index}" for index in range(11)],
         )
+
+
+def test_shrimp_list_item_includes_raw_description() -> None:
+    description = (
+        "## Red Boa Caridina Shrimp\n\n"
+        "**Red Boa Shrimp** is a premium freshwater Caridina variety.\n\n"
+        "- Deep red coloration"
+    )
+
+    shrimp = ShrimpListItemResponse(
+        id=uuid.uuid4(),
+        name="Red Boa",
+        slug="red-boa",
+        species="Caridina",
+        line="Caridina",
+        colors=["red"],
+        grade="SSS",
+        rarity="rare",
+        description=description,
+        catalog_status=CatalogStatus.ACTIVE.value,
+        traits=["boa"],
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        is_available=True,
+        min_price=Decimal("45.00"),
+        total_stock=8,
+        primary_image_url=None,
+        care_level="intermediate",
+    )
+
+    assert shrimp.description == description
 
 
 @pytest.mark.parametrize("sale_quantity", [1, 5, 10])

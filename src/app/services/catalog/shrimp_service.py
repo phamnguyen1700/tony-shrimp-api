@@ -103,6 +103,7 @@ def to_shrimp_list_item_response(shrimp: Shrimp) -> ShrimpListItemResponse:
         colors=shrimp.colors,
         grade=shrimp.grade,
         rarity=shrimp.rarity,
+        description=shrimp.description,
         catalog_status=shrimp.catalog_status,
         traits=shrimp.traits,
         created_at=shrimp.created_at,
