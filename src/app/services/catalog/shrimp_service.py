@@ -265,6 +265,21 @@ async def get_shrimp_catalog_item(
     return to_shrimp_detail_response(shrimp)
 
 
+async def get_shrimp_catalog_item_by_slug(
+    db: AsyncSession,
+    slug: str,
+    *,
+    active_only: bool = False,
+) -> ShrimpDetailResponse:
+    shrimp = await get_shrimp_by_slug(db, slug)
+    if shrimp is None or (
+        active_only and shrimp.catalog_status != CatalogStatus.ACTIVE.value
+    ):
+        raise ValueError("Shrimp not found.")
+
+    return to_shrimp_detail_response(shrimp)
+
+
 async def list_shrimp_catalog_items(
     db: AsyncSession,
     *,

@@ -257,6 +257,7 @@ async def create_owner_image_presigned_upload(
             folder=f"shrimp/{shrimp_id}",
             filename=payload.filename,
             content_type=payload.content_type,
+            file_size_bytes=payload.file_size_bytes,
         )
     except ValueError as exc:
         status_code = (

@@ -13,6 +13,19 @@ ALLOWED_IMAGE_CONTENT_TYPES = {
     "image/webp": ".webp",
 }
 
+ALLOWED_VIDEO_CONTENT_TYPES = {
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "video/quicktime": ".mov",
+}
+
+ALLOWED_UPLOAD_CONTENT_TYPES = {
+    **ALLOWED_IMAGE_CONTENT_TYPES,
+    **ALLOWED_VIDEO_CONTENT_TYPES,
+}
+
+MAX_VIDEO_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024
+
 
 def normalize_upload_folder(folder: str) -> str:
     normalized = folder.strip().lower()
@@ -23,12 +36,27 @@ def normalize_upload_folder(folder: str) -> str:
 
 def get_file_extension(filename: str, content_type: str) -> str:
     suffix = PurePosixPath(filename).suffix.lower()
-    allowed_suffix = ALLOWED_IMAGE_CONTENT_TYPES[content_type]
+    allowed_suffix = ALLOWED_UPLOAD_CONTENT_TYPES[content_type]
 
-    if suffix in ALLOWED_IMAGE_CONTENT_TYPES.values():
+    if suffix in ALLOWED_UPLOAD_CONTENT_TYPES.values():
         return suffix
 
     return allowed_suffix
+
+
+def validate_upload_content(
+    *,
+    content_type: str,
+    file_size_bytes: int | None = None,
+) -> None:
+    if content_type not in ALLOWED_UPLOAD_CONTENT_TYPES:
+        raise ValueError("Unsupported upload content type.")
+
+    if content_type in ALLOWED_VIDEO_CONTENT_TYPES:
+        if file_size_bytes is None:
+            raise ValueError("Video file size is required.")
+        if file_size_bytes >= MAX_VIDEO_UPLOAD_SIZE_BYTES:
+            raise ValueError("Video file size must be less than 100MB.")
 
 
 def create_r2_client():
@@ -60,9 +88,12 @@ def create_presigned_upload_url(
     folder: str,
     filename: str,
     content_type: str,
+    file_size_bytes: int | None = None,
 ) -> PresignedUploadResponse:
-    if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
-        raise ValueError("Unsupported image content type.")
+    validate_upload_content(
+        content_type=content_type,
+        file_size_bytes=file_size_bytes,
+    )
 
     normalized_folder = normalize_upload_folder(folder)
     extension = get_file_extension(filename, content_type)
