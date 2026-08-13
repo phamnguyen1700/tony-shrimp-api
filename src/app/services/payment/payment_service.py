@@ -32,9 +32,14 @@ from app.services.notification import (
 
 
 def stripe_object_to_dict(value: Any) -> dict[str, Any]:
-    if hasattr(value, "to_dict_recursive"):
-        return value.to_dict_recursive()
-    return dict(value)
+    if isinstance(value, dict):
+        return value
+
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        return to_dict()
+
+    return {"value": str(value)}
 
 
 def stripe_get(value: Any, key: str, default: Any = None) -> Any:
