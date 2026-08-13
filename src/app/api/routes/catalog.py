@@ -14,6 +14,7 @@ from app.schemas.catalog import (
 from app.services.catalog import (
     get_catalog_options,
     get_shrimp_catalog_item,
+    get_shrimp_catalog_item_by_slug,
     list_shrimp_catalog_items,
 )
 
@@ -57,6 +58,20 @@ async def list_shrimp(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/shrimp/slug/{slug}", response_model=ShrimpDetailResponse)
+async def get_shrimp_by_slug(
+    slug: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> ShrimpDetailResponse:
+    try:
+        return await get_shrimp_catalog_item_by_slug(db, slug, active_only=True)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/shrimp/{shrimp_id}", response_model=ShrimpDetailResponse)
