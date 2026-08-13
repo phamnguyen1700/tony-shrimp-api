@@ -55,6 +55,13 @@ def normalize_status_at(value: datetime | None) -> datetime:
     return value
 
 
+def stripe_get(value: object, key: str, default: object = None) -> object:
+    if isinstance(value, dict):
+        return value.get(key, default)
+
+    return getattr(value, key, default)
+
+
 async def create_unique_order_number(db: AsyncSession) -> str:
     for _ in range(10):
         candidate = f"TS-{secrets.randbelow(900000) + 100000}"
@@ -241,14 +248,18 @@ async def create_customer_order(
         order=refreshed_order,
         customer_email=current_user.email,
     )
-    checkout_url = checkout_session.url
+    checkout_url = stripe_get(checkout_session, "url")
     if not checkout_url:
         raise RuntimeError("Stripe checkout session did not return a URL.")
+
+    checkout_session_id = stripe_get(checkout_session, "id")
+    if not checkout_session_id:
+        raise RuntimeError("Stripe checkout session did not return an ID.")
 
     await update_order_payment_fields(
         db,
         refreshed_order,
-        stripe_checkout_session_id=str(checkout_session["id"]),
+        stripe_checkout_session_id=str(checkout_session_id),
     )
     await db.commit()
 
@@ -259,7 +270,7 @@ async def create_customer_order(
     return CheckoutOrderResponse(
         order=build_order_detail_response(created),
         checkout_url=str(checkout_url),
-        stripe_session_id=str(checkout_session["id"]),
+        stripe_session_id=str(checkout_session_id),
     )
 
 

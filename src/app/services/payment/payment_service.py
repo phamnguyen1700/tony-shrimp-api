@@ -6,7 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.auth import UserRole
 from app.models.notification import NotificationType
-from app.models.order import CancelledReason, Order, OrderStatus, PaymentProvider, PaymentStatus
+from app.models.order import (
+    CancelledReason,
+    Order,
+    OrderStatus,
+    PaymentProvider,
+    PaymentStatus,
+)
 from app.repositories.order import (
     create_order_status_event,
     get_order_by_id,
@@ -31,6 +37,13 @@ def stripe_object_to_dict(value: Any) -> dict[str, Any]:
     return dict(value)
 
 
+def stripe_get(value: Any, key: str, default: Any = None) -> Any:
+    if isinstance(value, dict):
+        return value.get(key, default)
+
+    return getattr(value, key, default)
+
+
 def get_stripe_event_object(event: Any) -> Any:
     return event["data"]["object"]
 
@@ -44,8 +57,9 @@ def get_stripe_event_type(event: Any) -> str:
 
 
 def get_metadata_order_id(stripe_object: Any) -> uuid.UUID | None:
-    metadata = stripe_object.get("metadata") or {}
+    metadata = stripe_get(stripe_object, "metadata", {}) or {}
     order_id = metadata.get("order_id")
+
     if not order_id:
         return None
 
@@ -83,7 +97,7 @@ async def find_order_for_checkout_session(
     if order_id is not None:
         return await get_order_by_id(db, order_id)
 
-    session_id = stripe_session.get("id")
+    session_id = stripe_get(stripe_session, "id")
     if session_id:
         return await get_order_by_stripe_checkout_session_id(db, str(session_id))
 
@@ -98,12 +112,13 @@ async def handle_checkout_completed(
     if order is None:
         return None
 
-    payment_intent_id = stripe_session.get("payment_intent")
+    session_id = stripe_get(stripe_session, "id")
+    payment_intent_id = stripe_get(stripe_session, "payment_intent")
     await update_order_payment_fields(
         db,
         order,
         payment_status=PaymentStatus.PAID.value,
-        stripe_checkout_session_id=str(stripe_session["id"]),
+        stripe_checkout_session_id=str(session_id),
         stripe_payment_intent_id=str(payment_intent_id) if payment_intent_id else None,
         paid_at=datetime.now(UTC),
     )
@@ -165,7 +180,7 @@ async def handle_payment_intent_failed(
     db: AsyncSession,
     payment_intent: Any,
 ) -> Order | None:
-    payment_intent_id = str(payment_intent["id"])
+    payment_intent_id = str(stripe_get(payment_intent, "id"))
     order = await get_order_by_stripe_payment_intent_id(db, payment_intent_id)
     if order is None:
         order_id = get_metadata_order_id(payment_intent)
@@ -185,7 +200,7 @@ async def handle_charge_refunded(
     db: AsyncSession,
     charge: Any,
 ) -> Order | None:
-    payment_intent_id = charge.get("payment_intent")
+    payment_intent_id = stripe_get(charge, "payment_intent")
     if not payment_intent_id:
         return None
 
