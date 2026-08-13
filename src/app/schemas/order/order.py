@@ -58,6 +58,8 @@ class OrderResponse(BaseModel):
     status: str
     payment_status: str
     payment_provider: str
+    stripe_checkout_url: str | None
+    stripe_checkout_expires_at: datetime | None
     subtotal_amount: Decimal
     shipping_amount: Decimal
     total_amount: Decimal
@@ -90,6 +92,7 @@ class CheckoutOrderResponse(BaseModel):
     order: OrderDetailResponse
     checkout_url: str
     stripe_session_id: str
+    stripe_checkout_expires_at: datetime | None
     payment_status: PaymentStatus = PaymentStatus.PENDING
     payment_provider: PaymentProvider = PaymentProvider.STRIPE
 

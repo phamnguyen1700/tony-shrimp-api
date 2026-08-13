@@ -1,4 +1,6 @@
 from app.services.order.order_service import (
+    cancel_customer_order,
+    continue_customer_order_payment,
     create_customer_order,
     get_customer_order,
     get_owner_order,
@@ -8,6 +10,8 @@ from app.services.order.order_service import (
 )
 
 __all__ = [
+    "cancel_customer_order",
+    "continue_customer_order_payment",
     "create_customer_order",
     "get_customer_order",
     "get_owner_order",

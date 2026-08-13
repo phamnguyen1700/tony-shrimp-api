@@ -38,6 +38,7 @@ class CancelledReason(StrEnum):
     PAYMENT_TIMEOUT = "payment_timeout"
     PAYMENT_FAILED = "payment_failed"
     OWNER_CANCELLED = "owner_cancelled"
+    CUSTOMER_CANCELLED = "customer_cancelled"
     CUSTOMER_REQUEST = "customer_request"
 
 
@@ -101,6 +102,14 @@ class Order(Base):
         String(255),
         nullable=True,
         unique=True,
+    )
+    stripe_checkout_url: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    stripe_checkout_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
     stripe_payment_intent_id: Mapped[str | None] = mapped_column(
         String(255),

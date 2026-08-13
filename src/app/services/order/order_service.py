@@ -9,7 +9,13 @@ from app.core.config import get_settings
 from app.core.pii import decrypt_pii
 from app.models.auth import User
 from app.models.catalog import CatalogStatus, ShrimpImage, ShrimpVariant
-from app.models.order import Order, OrderStatus, PaymentProvider, PaymentStatus
+from app.models.order import (
+    CancelledReason,
+    Order,
+    OrderStatus,
+    PaymentProvider,
+    PaymentStatus,
+)
 from app.repositories.order import (
     count_orders,
     create_order,
@@ -62,6 +68,16 @@ def stripe_get(value: object, key: str, default: object = None) -> object:
     return getattr(value, key, default)
 
 
+def datetime_from_stripe_timestamp(value: object) -> datetime | None:
+    if value is None:
+        return None
+
+    try:
+        return datetime.fromtimestamp(int(value), tz=UTC)
+    except (TypeError, ValueError):
+        return None
+
+
 async def create_unique_order_number(db: AsyncSession) -> str:
     for _ in range(10):
         candidate = f"TS-{secrets.randbelow(900000) + 100000}"
@@ -103,6 +119,8 @@ def build_order_response(order: Order) -> OrderResponse:
         status=order.status,
         payment_status=order.payment_status,
         payment_provider=order.payment_provider,
+        stripe_checkout_url=order.stripe_checkout_url,
+        stripe_checkout_expires_at=order.stripe_checkout_expires_at,
         subtotal_amount=order.subtotal_amount,
         shipping_amount=order.shipping_amount,
         total_amount=order.total_amount,
@@ -255,11 +273,16 @@ async def create_customer_order(
     checkout_session_id = stripe_get(checkout_session, "id")
     if not checkout_session_id:
         raise RuntimeError("Stripe checkout session did not return an ID.")
+    checkout_expires_at = datetime_from_stripe_timestamp(
+        stripe_get(checkout_session, "expires_at")
+    )
 
     await update_order_payment_fields(
         db,
         refreshed_order,
         stripe_checkout_session_id=str(checkout_session_id),
+        stripe_checkout_url=str(checkout_url),
+        stripe_checkout_expires_at=checkout_expires_at,
     )
     await db.commit()
 
@@ -271,7 +294,117 @@ async def create_customer_order(
         order=build_order_detail_response(created),
         checkout_url=str(checkout_url),
         stripe_session_id=str(checkout_session_id),
+        stripe_checkout_expires_at=checkout_expires_at,
     )
+
+
+def order_can_continue_payment(order: Order) -> bool:
+    return (
+        order.status == OrderStatus.PROCESSING.value
+        and order.payment_status == PaymentStatus.PENDING.value
+    )
+
+
+def order_has_active_checkout_url(order: Order) -> bool:
+    if not order.stripe_checkout_url or order.stripe_checkout_expires_at is None:
+        return False
+
+    return order.stripe_checkout_expires_at > datetime.now(UTC)
+
+
+async def continue_customer_order_payment(
+    db: AsyncSession,
+    *,
+    current_user: User,
+    order_id: uuid.UUID,
+) -> CheckoutOrderResponse:
+    order = await get_order_by_id(db, order_id)
+    if order is None or order.user_id != current_user.id:
+        raise ValueError("Order not found.")
+    if not order_can_continue_payment(order):
+        raise ValueError("Order cannot continue payment.")
+
+    if order_has_active_checkout_url(order):
+        return CheckoutOrderResponse(
+            order=build_order_detail_response(order),
+            checkout_url=str(order.stripe_checkout_url),
+            stripe_session_id=str(order.stripe_checkout_session_id or ""),
+            stripe_checkout_expires_at=order.stripe_checkout_expires_at,
+        )
+
+    checkout_session = create_order_checkout_session(
+        order=order,
+        customer_email=current_user.email,
+    )
+    checkout_url = stripe_get(checkout_session, "url")
+    if not checkout_url:
+        raise RuntimeError("Stripe checkout session did not return a URL.")
+
+    checkout_session_id = stripe_get(checkout_session, "id")
+    if not checkout_session_id:
+        raise RuntimeError("Stripe checkout session did not return an ID.")
+    checkout_expires_at = datetime_from_stripe_timestamp(
+        stripe_get(checkout_session, "expires_at")
+    )
+
+    await update_order_payment_fields(
+        db,
+        order,
+        stripe_checkout_session_id=str(checkout_session_id),
+        stripe_checkout_url=str(checkout_url),
+        stripe_checkout_expires_at=checkout_expires_at,
+    )
+    await db.commit()
+
+    refreshed_order = await get_order_by_id(db, order.id)
+    if refreshed_order is None:
+        raise RuntimeError("Order could not be loaded.")
+
+    return CheckoutOrderResponse(
+        order=build_order_detail_response(refreshed_order),
+        checkout_url=str(checkout_url),
+        stripe_session_id=str(checkout_session_id),
+        stripe_checkout_expires_at=checkout_expires_at,
+    )
+
+
+async def cancel_customer_order(
+    db: AsyncSession,
+    *,
+    current_user: User,
+    order_id: uuid.UUID,
+) -> OrderDetailResponse:
+    order = await get_order_by_id(db, order_id)
+    if order is None or order.user_id != current_user.id:
+        raise ValueError("Order not found.")
+    if not order_can_continue_payment(order):
+        raise ValueError("Only pending payment orders can be cancelled.")
+
+    cancelled_at = datetime.now(UTC)
+    order.status = OrderStatus.CANCELLED.value
+    order.cancelled_at = cancelled_at
+    await update_order_payment_fields(
+        db,
+        order,
+        payment_status=PaymentStatus.FAILED.value,
+        payment_failed_at=cancelled_at,
+        cancelled_reason=CancelledReason.CUSTOMER_CANCELLED.value,
+    )
+    await create_order_status_event(
+        db,
+        order_id=order.id,
+        status=OrderStatus.CANCELLED.value,
+        message="Customer cancelled unpaid order.",
+        created_by_user_id=current_user.id,
+        created_at=cancelled_at,
+    )
+    await db.commit()
+
+    refreshed_order = await get_order_by_id(db, order.id)
+    if refreshed_order is None:
+        raise RuntimeError("Cancelled order could not be loaded.")
+
+    return build_order_detail_response(refreshed_order)
 
 
 async def list_customer_orders(

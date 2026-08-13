@@ -15,6 +15,7 @@ from app.models.order import (
 )
 from app.repositories.order import (
     create_order_status_event,
+    decrement_variant_stock,
     get_order_by_id,
     get_order_by_stripe_checkout_session_id,
     get_order_by_stripe_payment_intent_id,
@@ -95,6 +96,18 @@ async def notify_paid_order(db: AsyncSession, order: Order) -> None:
     await publish_notifications(notifications)
 
 
+async def decrement_stock_for_paid_order(db: AsyncSession, order: Order) -> None:
+    for item in order.items:
+        if item.variant_id is None:
+            continue
+
+        await decrement_variant_stock(
+            db,
+            variant_id=item.variant_id,
+            quantity=item.quantity,
+        )
+
+
 async def find_order_for_checkout_session(
     db: AsyncSession,
     stripe_session: Any,
@@ -117,12 +130,15 @@ async def handle_checkout_completed(
     order = await find_order_for_checkout_session(db, stripe_session)
     if order is None:
         return None
+    if order.payment_status == PaymentStatus.PAID.value:
+        return order
 
     session_id = stripe_get(stripe_session, "id")
     if not session_id:
         return None
 
     payment_intent_id = stripe_get(stripe_session, "payment_intent")
+    await decrement_stock_for_paid_order(db, order)
     await update_order_payment_fields(
         db,
         order,
@@ -176,6 +192,9 @@ async def handle_checkout_expired(
     order = await find_order_for_checkout_session(db, stripe_session)
     if order is None or order.payment_status != PaymentStatus.PENDING.value:
         return order
+    session_id = stripe_get(stripe_session, "id")
+    if session_id and order.stripe_checkout_session_id != str(session_id):
+        return order
 
     return await cancel_order_for_failed_payment(
         db,
@@ -197,15 +216,11 @@ async def handle_payment_intent_failed(
     if order is None:
         order_id = get_metadata_order_id(payment_intent)
         order = await get_order_by_id(db, order_id) if order_id is not None else None
-    if order is None or order.payment_status != PaymentStatus.PENDING.value:
-        return order
 
-    return await cancel_order_for_failed_payment(
-        db,
-        order,
-        reason=CancelledReason.PAYMENT_FAILED,
-        message="Payment failed.",
-    )
+    # A failed PaymentIntent can be only one failed attempt while hosted Checkout
+    # still allows the customer to retry. Let Checkout expiry or explicit customer
+    # cancellation decide when the order is cancelled.
+    return order
 
 
 async def handle_charge_refunded(

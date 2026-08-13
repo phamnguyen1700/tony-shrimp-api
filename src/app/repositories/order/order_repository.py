@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -181,6 +181,8 @@ async def update_order_payment_fields(
     *,
     payment_status: str | None = None,
     stripe_checkout_session_id: str | None = None,
+    stripe_checkout_url: str | None = None,
+    stripe_checkout_expires_at: datetime | None = None,
     stripe_payment_intent_id: str | None = None,
     paid_at: datetime | None = None,
     payment_failed_at: datetime | None = None,
@@ -190,6 +192,10 @@ async def update_order_payment_fields(
         order.payment_status = payment_status
     if stripe_checkout_session_id is not None:
         order.stripe_checkout_session_id = stripe_checkout_session_id
+    if stripe_checkout_url is not None:
+        order.stripe_checkout_url = stripe_checkout_url
+    if stripe_checkout_expires_at is not None:
+        order.stripe_checkout_expires_at = stripe_checkout_expires_at
     if stripe_payment_intent_id is not None:
         order.stripe_payment_intent_id = stripe_payment_intent_id
     if paid_at is not None:
@@ -201,6 +207,22 @@ async def update_order_payment_fields(
 
     await db.flush()
     return order
+
+
+async def decrement_variant_stock(
+    db: AsyncSession,
+    *,
+    variant_id: uuid.UUID,
+    quantity: int,
+) -> None:
+    await db.execute(
+        update(ShrimpVariant)
+        .where(ShrimpVariant.id == variant_id)
+        .values(
+            stock_quantity=func.greatest(ShrimpVariant.stock_quantity - quantity, 0)
+        )
+    )
+    await db.flush()
 
 
 async def list_pending_payment_orders_older_than(
