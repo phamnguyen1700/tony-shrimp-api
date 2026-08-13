@@ -64,7 +64,9 @@ class Settings(BaseSettings):
     stripe_success_url: str = (
         "https://tonyshrimp.com.au/orders/success?session_id={CHECKOUT_SESSION_ID}"
     )
-    stripe_cancel_url: str = "https://tonyshrimp.com.au/cart"
+    stripe_cancel_url: str = (
+        "https://tonyshrimp.com.au/orders/failed?session_id={CHECKOUT_SESSION_ID}"
+    )
     stripe_checkout_expires_after_minutes: int = 30
 
     cors_origins: str = (

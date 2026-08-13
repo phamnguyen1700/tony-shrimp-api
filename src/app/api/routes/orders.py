@@ -16,6 +16,7 @@ from app.services.order import (
     continue_customer_order_payment,
     create_customer_order,
     get_customer_order,
+    get_customer_order_by_payment_session,
     list_customer_orders,
 )
 
@@ -55,6 +56,22 @@ async def list_my_orders(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/payment-session/{session_id}", response_model=OrderDetailResponse)
+async def get_my_order_by_payment_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> OrderDetailResponse:
+    try:
+        return await get_customer_order_by_payment_session(
+            db,
+            user_id=current_user.id,
+            stripe_session_id=session_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get("/{order_id}", response_model=OrderDetailResponse)

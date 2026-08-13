@@ -23,6 +23,7 @@ from app.repositories.order import (
     create_order_status_event,
     get_order_by_id,
     get_order_by_order_number,
+    get_order_by_stripe_checkout_session_id,
     get_variant_for_order,
     list_orders,
     update_order_payment_fields,
@@ -431,6 +432,19 @@ async def get_customer_order(
     order_id: uuid.UUID,
 ) -> OrderDetailResponse:
     order = await get_order_by_id(db, order_id)
+    if order is None or order.user_id != user_id:
+        raise ValueError("Order not found.")
+
+    return build_order_detail_response(order)
+
+
+async def get_customer_order_by_payment_session(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    stripe_session_id: str,
+) -> OrderDetailResponse:
+    order = await get_order_by_stripe_checkout_session_id(db, stripe_session_id)
     if order is None or order.user_id != user_id:
         raise ValueError("Order not found.")
 
