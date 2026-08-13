@@ -241,7 +241,7 @@ async def create_customer_order(
         order=refreshed_order,
         customer_email=current_user.email,
     )
-    checkout_url = checkout_session.get("url")
+    checkout_url = checkout_session.url
     if not checkout_url:
         raise RuntimeError("Stripe checkout session did not return a URL.")
 
@@ -365,4 +365,3 @@ async def update_owner_order_status(
         raise RuntimeError("Updated order could not be loaded.")
 
     return build_order_detail_response(refreshed_order)
-
