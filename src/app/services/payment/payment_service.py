@@ -45,20 +45,21 @@ def stripe_get(value: Any, key: str, default: Any = None) -> Any:
 
 
 def get_stripe_event_object(event: Any) -> Any:
-    return event["data"]["object"]
+    data = stripe_get(event, "data", {}) or {}
+    return stripe_get(data, "object")
 
 
 def get_stripe_event_id(event: Any) -> str:
-    return str(event["id"])
+    return str(stripe_get(event, "id"))
 
 
 def get_stripe_event_type(event: Any) -> str:
-    return str(event["type"])
+    return str(stripe_get(event, "type"))
 
 
 def get_metadata_order_id(stripe_object: Any) -> uuid.UUID | None:
     metadata = stripe_get(stripe_object, "metadata", {}) or {}
-    order_id = metadata.get("order_id")
+    order_id = stripe_get(metadata, "order_id")
 
     if not order_id:
         return None
@@ -113,6 +114,9 @@ async def handle_checkout_completed(
         return None
 
     session_id = stripe_get(stripe_session, "id")
+    if not session_id:
+        return None
+
     payment_intent_id = stripe_get(stripe_session, "payment_intent")
     await update_order_payment_fields(
         db,
@@ -180,7 +184,10 @@ async def handle_payment_intent_failed(
     db: AsyncSession,
     payment_intent: Any,
 ) -> Order | None:
-    payment_intent_id = str(stripe_get(payment_intent, "id"))
+    payment_intent_id = stripe_get(payment_intent, "id")
+    if not payment_intent_id:
+        return None
+
     order = await get_order_by_stripe_payment_intent_id(db, payment_intent_id)
     if order is None:
         order_id = get_metadata_order_id(payment_intent)
