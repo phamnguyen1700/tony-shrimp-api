@@ -13,6 +13,7 @@ from app.models.order import (
     OrderStatus,
     PaymentProvider,
     PaymentStatus,
+    StockReservationStatus,
 )
 from app.repositories.order import (
     create_order_status_event,
@@ -20,8 +21,10 @@ from app.repositories.order import (
     get_order_by_id,
     get_order_by_stripe_checkout_session_id,
     get_order_by_stripe_payment_intent_id,
-    get_variant_for_order,
     update_order_payment_fields,
+    increment_variant_stock,
+    consume_stock_reservation_once,
+    release_stock_reservation_once,
 )
 from app.repositories.payment import (
     create_payment_event,
@@ -78,10 +81,10 @@ def get_metadata_order_id(stripe_object: Any) -> uuid.UUID | None:
         return None
 
 
-class StockAllocationAfterPaymentError(RuntimeError):
-    def __init__(self, items: list[dict[str, object]]) -> None:
-        super().__init__("Insufficient stock while allocating paid order.")
-        self.items = items
+# class StockAllocationAfterPaymentError(RuntimeError):
+#     def __init__(self, items: list[dict[str, object]]) -> None:
+#         super().__init__("Insufficient stock while allocating paid order.")
+#         self.items = items
 
 
 async def notify_paid_order(db: AsyncSession, order: Order) -> None:
@@ -104,62 +107,87 @@ async def notify_paid_order(db: AsyncSession, order: Order) -> None:
     await publish_notifications(notifications)
 
 
-async def notify_stock_allocation_failed(
+async def release_order_stock_reservation(
     db: AsyncSession,
     order: Order,
-    items: list[dict[str, object]],
-) -> None:
-    notifications = []
-    for role in (UserRole.OWNER.value, UserRole.ADMIN.value):
-        notifications.append(
-            await create_notification_for_audience(
-                db,
-                recipient_role=role,
-                type=NotificationType.NEW_ORDER.value,
-                title=f"Manual stock review needed for {order.order_number}",
-                message="Payment succeeded but stock allocation failed for one or more items.",
-                data={
-                    "order_id": str(order.id),
-                    "order_number": order.order_number,
-                    "issue": "post_payment_stock_allocation_failed",
-                    "items": items,
-                },
-            )
+) -> bool:
+    released = await release_stock_reservation_once(
+        db,
+        order_id=order.id,
+    )
+
+    if not released:
+        return False
+
+    for item in order.items:
+        if item.variant_id is None:
+            continue
+
+        await increment_variant_stock(
+            db,
+            variant_id=item.variant_id,
+            quantity=item.quantity,
         )
 
-    await publish_notifications(notifications)
+    return True
 
 
-async def decrement_stock_for_paid_order(db: AsyncSession, order: Order) -> None:
-    insufficient_stock_items: list[dict[str, object]] = []
+# async def notify_stock_allocation_failed(
+#     db: AsyncSession,
+#     order: Order,
+#     items: list[dict[str, object]],
+# ) -> None:
+#     notifications = []
+#     for role in (UserRole.OWNER.value, UserRole.ADMIN.value):
+#         notifications.append(
+#             await create_notification_for_audience(
+#                 db,
+#                 recipient_role=role,
+#                 type=NotificationType.NEW_ORDER.value,
+#                 title=f"Manual stock review needed for {order.order_number}",
+#                 message="Payment succeeded but stock allocation failed for one or more items.",
+#                 data={
+#                     "order_id": str(order.id),
+#                     "order_number": order.order_number,
+#                     "issue": "post_payment_stock_allocation_failed",
+#                     "items": items,
+#                 },
+#             )
+#         )
 
-    # Keep decrement operations in a nested transaction so we can rollback any
-    # partial decrements when one item fails allocation.
-    async with db.begin_nested():
-        for item in order.items:
-            if item.variant_id is None:
-                continue
+#     await publish_notifications(notifications)
 
-            updated = await decrement_variant_stock(
-                db,
-                variant_id=item.variant_id,
-                quantity=item.quantity,
-            )
-            if updated:
-                continue
 
-            variant = await get_variant_for_order(db, item.variant_id)
-            available = variant.stock_quantity if variant is not None else 0
-            insufficient_stock_items.append(
-                {
-                    "variant_id": str(item.variant_id),
-                    "requested": item.quantity,
-                    "available": available,
-                }
-            )
+# async def decrement_stock_for_paid_order(db: AsyncSession, order: Order) -> None:
+#     insufficient_stock_items: list[dict[str, object]] = []
 
-        if insufficient_stock_items:
-            raise StockAllocationAfterPaymentError(insufficient_stock_items)
+#     # Keep decrement operations in a nested transaction so we can rollback any
+#     # partial decrements when one item fails allocation.
+#     async with db.begin_nested():
+#         for item in order.items:
+#             if item.variant_id is None:
+#                 continue
+
+#             updated = await decrement_variant_stock(
+#                 db,
+#                 variant_id=item.variant_id,
+#                 quantity=item.quantity,
+#             )
+#             if updated:
+#                 continue
+
+#             variant = await get_variant_for_order(db, item.variant_id)
+#             available = variant.stock_quantity if variant is not None else 0
+#             insufficient_stock_items.append(
+#                 {
+#                     "variant_id": str(item.variant_id),
+#                     "requested": item.quantity,
+#                     "available": available,
+#                 }
+#             )
+
+#         if insufficient_stock_items:
+#             raise StockAllocationAfterPaymentError(insufficient_stock_items)
 
 
 async def find_order_for_checkout_session(
@@ -184,6 +212,7 @@ async def handle_checkout_completed(
     order = await find_order_for_checkout_session(db, stripe_session)
     if order is None:
         return None
+
     if order.payment_status == PaymentStatus.PAID.value:
         return order
 
@@ -194,30 +223,41 @@ async def handle_checkout_completed(
     payment_intent_id = stripe_get(stripe_session, "payment_intent")
     paid_at = datetime.now(UTC)
 
-    try:
-        await decrement_stock_for_paid_order(db, order)
-    except StockAllocationAfterPaymentError as exc:
-        await update_order_payment_fields(
-            db,
-            order,
-            payment_status=PaymentStatus.PAID.value,
-            stripe_checkout_session_id=str(session_id),
-            stripe_payment_intent_id=(
-                str(payment_intent_id) if payment_intent_id else None
-            ),
-            paid_at=paid_at,
-        )
-        await create_order_status_event(
-            db,
-            order_id=order.id,
-            status=OrderStatus.PROCESSING.value,
-            message=(
-                "Payment received but stock allocation failed for one or more "
-                "items. Manual review required."
-            ),
-            created_by_user_id=None,
-        )
-        await notify_stock_allocation_failed(db, order, exc.items)
+    consumed = await consume_stock_reservation_once(
+        db,
+        order_id=order.id,
+    )
+
+    if not consumed:
+        await db.refresh(order)
+
+        # Reservation đã bị release nhưng Stripe vẫn báo payment success.
+        # Đây là late-payment/inconsistent state, cần manual review.
+        if order.stock_reservation_status == StockReservationStatus.RELEASED.value:
+            await update_order_payment_fields(
+                db,
+                order,
+                payment_status=PaymentStatus.PAID.value,
+                stripe_checkout_session_id=str(session_id),
+                stripe_payment_intent_id=(
+                    str(payment_intent_id) if payment_intent_id else None
+                ),
+                paid_at=paid_at,
+            )
+
+            await create_order_status_event(
+                db,
+                order_id=order.id,
+                status=order.status,
+                message=(
+                    "Payment received after stock reservation was released. "
+                    "Manual review required."
+                ),
+                created_by_user_id=None,
+            )
+
+            return order
+
         return order
 
     await update_order_payment_fields(
@@ -225,9 +265,12 @@ async def handle_checkout_completed(
         order,
         payment_status=PaymentStatus.PAID.value,
         stripe_checkout_session_id=str(session_id),
-        stripe_payment_intent_id=str(payment_intent_id) if payment_intent_id else None,
+        stripe_payment_intent_id=(
+            str(payment_intent_id) if payment_intent_id else None
+        ),
         paid_at=paid_at,
     )
+
     await create_order_status_event(
         db,
         order_id=order.id,
@@ -235,7 +278,9 @@ async def handle_checkout_completed(
         message="Payment received.",
         created_by_user_id=None,
     )
+
     await notify_paid_order(db, order)
+
     return order
 
 
@@ -271,10 +316,20 @@ async def handle_checkout_expired(
     stripe_session: Any,
 ) -> Order | None:
     order = await find_order_for_checkout_session(db, stripe_session)
+
     if order is None or order.payment_status != PaymentStatus.PENDING.value:
         return order
+
     session_id = stripe_get(stripe_session, "id")
     if session_id and order.stripe_checkout_session_id != str(session_id):
+        return order
+
+    released = await release_order_stock_reservation(
+        db,
+        order,
+    )
+
+    if not released:
         return order
 
     return await cancel_order_for_failed_payment(

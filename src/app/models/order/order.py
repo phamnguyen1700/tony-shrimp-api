@@ -42,6 +42,12 @@ class CancelledReason(StrEnum):
     CUSTOMER_REQUEST = "customer_request"
 
 
+class StockReservationStatus(StrEnum):
+    RESERVED = "reserved"
+    CONSUMED = "consumed"
+    RELEASED = "released"
+
+
 class Order(Base):
     __tablename__ = "orders"
 
@@ -85,6 +91,12 @@ class Order(Base):
         String(3),
         nullable=False,
         default="AUD",
+    )
+    stock_reservation_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default=StockReservationStatus.RESERVED.value,
+        index=True,
     )
     payment_status: Mapped[str] = mapped_column(
         String(32),
