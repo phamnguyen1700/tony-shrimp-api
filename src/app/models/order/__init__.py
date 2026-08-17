@@ -4,6 +4,7 @@ from app.models.order.order import (
     OrderStatus,
     PaymentProvider,
     PaymentStatus,
+    StockReservationStatus,
 )
 from app.models.order.order_item import OrderItem
 from app.models.order.order_status_event import OrderStatusEvent
@@ -16,4 +17,5 @@ __all__ = [
     "OrderStatusEvent",
     "PaymentProvider",
     "PaymentStatus",
+    "StockReservationStatus",
 ]

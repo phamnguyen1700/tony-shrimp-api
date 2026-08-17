@@ -15,6 +15,7 @@ from app.models.order import (
     OrderStatus,
     PaymentProvider,
     PaymentStatus,
+    StockReservationStatus,
 )
 from app.repositories.order import (
     count_orders,
@@ -27,6 +28,9 @@ from app.repositories.order import (
     get_variant_for_order,
     list_orders,
     update_order_payment_fields,
+    decrement_variant_stock,
+    increment_variant_stock,
+    release_stock_reservation_once,
 )
 from app.repositories.user import get_user_address
 from app.schemas.order import (
@@ -198,6 +202,31 @@ def aggregate_order_items(payload: CreateOrderRequest) -> dict[uuid.UUID, int]:
     return quantities
 
 
+async def release_order_stock_reservation(
+    db: AsyncSession,
+    order: Order,
+) -> bool:
+    released = await release_stock_reservation_once(
+        db,
+        order_id=order.id,
+    )
+
+    if not released:
+        return False
+
+    for item in order.items:
+        if item.variant_id is None:
+            continue
+
+        await increment_variant_stock(
+            db,
+            variant_id=item.variant_id,
+            quantity=item.quantity,
+        )
+
+    return True
+
+
 async def create_customer_order(
     db: AsyncSession,
     *,
@@ -215,8 +244,8 @@ async def create_customer_order(
     quantities = aggregate_order_items(payload)
     variant_snapshots: list[tuple[ShrimpVariant, int, Decimal]] = []
     subtotal = Decimal("0.00")
-    insufficient_stock_items: list[dict[str, object]] = []
 
+    insufficient_stock_items: list[dict[str, object]] = []
     for variant_id, quantity in quantities.items():
         variant = await get_variant_for_order(db, variant_id)
         if variant is None or not variant.is_active:
@@ -240,83 +269,110 @@ async def create_customer_order(
     if insufficient_stock_items:
         raise InsufficientStockCheckoutError(insufficient_stock_items)
 
-    shipping_amount = settings.order_shipping_flat_rate_amount
-    total = subtotal + shipping_amount
-    order_number = await create_unique_order_number(db)
+    try:
+        reservation_failures: list[dict[str, object]] = []
+        for variant, quantity, _ in variant_snapshots:
+            reserved = await decrement_variant_stock(
+                db, variant_id=variant.id, quantity=quantity
+            )
 
-    order = await create_order(
-        db,
-        order_number=order_number,
-        user_id=current_user.id,
-        status=OrderStatus.PROCESSING.value,
-        payment_status=PaymentStatus.PENDING.value,
-        payment_provider=PaymentProvider.STRIPE.value,
-        subtotal_amount=subtotal,
-        shipping_amount=shipping_amount,
-        total_amount=total,
-        currency=settings.order_currency,
-        recipient_name=address.recipient_name,
-        recipient_phone_encrypted=address.recipient_phone_encrypted,
-        address_line1_encrypted=address.address_line1_encrypted,
-        address_line2_encrypted=address.address_line2_encrypted,
-        suburb=address.suburb,
-        state=address.state,
-        postcode=address.postcode,
-        customer_note=normalize_note(payload.customer_note),
-    )
+            if reserved:
+                continue
 
-    for variant, quantity, line_total in variant_snapshots:
-        await create_order_item(
+            await db.refresh(variant)
+
+            reservation_failures.append(
+                {
+                    "variant_id": str(variant.id),
+                    "requested": quantity,
+                    "available": variant.stock_quantity,
+                }
+            )
+
+        if reservation_failures:
+            raise InsufficientStockCheckoutError(reservation_failures)
+
+        shipping_amount = settings.order_shipping_flat_rate_amount
+        total = subtotal + shipping_amount
+        order_number = await create_unique_order_number(db)
+
+        order = await create_order(
             db,
-            order_id=order.id,
-            shrimp_id=variant.shrimp_id,
-            variant_id=variant.id,
-            shrimp_name_snapshot=variant.shrimp.name,
-            variant_name_snapshot=variant.name,
-            sale_unit_snapshot=variant.sale_unit,
-            sale_quantity_snapshot=variant.sale_quantity,
-            image_url_snapshot=get_primary_image_url(variant),
-            unit_price=variant.price,
-            quantity=quantity,
-            line_total=line_total,
+            order_number=order_number,
+            user_id=current_user.id,
+            status=OrderStatus.PROCESSING.value,
+            payment_status=PaymentStatus.PENDING.value,
+            payment_provider=PaymentProvider.STRIPE.value,
+            subtotal_amount=subtotal,
+            shipping_amount=shipping_amount,
+            total_amount=total,
+            currency=settings.order_currency,
+            recipient_name=address.recipient_name,
+            recipient_phone_encrypted=address.recipient_phone_encrypted,
+            address_line1_encrypted=address.address_line1_encrypted,
+            address_line2_encrypted=address.address_line2_encrypted,
+            suburb=address.suburb,
+            state=address.state,
+            postcode=address.postcode,
+            customer_note=normalize_note(payload.customer_note),
         )
 
-    await create_order_status_event(
-        db,
-        order_id=order.id,
-        status=OrderStatus.PROCESSING.value,
-        message="Checkout created.",
-        created_by_user_id=current_user.id,
-        created_at=order.created_at,
-    )
+        for variant, quantity, line_total in variant_snapshots:
+            await create_order_item(
+                db,
+                order_id=order.id,
+                shrimp_id=variant.shrimp_id,
+                variant_id=variant.id,
+                shrimp_name_snapshot=variant.shrimp.name,
+                variant_name_snapshot=variant.name,
+                sale_unit_snapshot=variant.sale_unit,
+                sale_quantity_snapshot=variant.sale_quantity,
+                image_url_snapshot=get_primary_image_url(variant),
+                unit_price=variant.price,
+                quantity=quantity,
+                line_total=line_total,
+            )
 
-    refreshed_order = await get_order_by_id(db, order.id)
-    if refreshed_order is None:
-        raise RuntimeError("Created order could not be loaded.")
+        await create_order_status_event(
+            db,
+            order_id=order.id,
+            status=OrderStatus.PROCESSING.value,
+            message="Checkout created.",
+            created_by_user_id=current_user.id,
+            created_at=order.created_at,
+        )
 
-    checkout_session = create_order_checkout_session(
-        order=refreshed_order,
-        customer_email=current_user.email,
-    )
-    checkout_url = stripe_get(checkout_session, "url")
-    if not checkout_url:
-        raise RuntimeError("Stripe checkout session did not return a URL.")
+        refreshed_order = await get_order_by_id(db, order.id)
+        if refreshed_order is None:
+            raise RuntimeError("Created order could not be loaded.")
 
-    checkout_session_id = stripe_get(checkout_session, "id")
-    if not checkout_session_id:
-        raise RuntimeError("Stripe checkout session did not return an ID.")
-    checkout_expires_at = datetime_from_stripe_timestamp(
-        stripe_get(checkout_session, "expires_at")
-    )
+        checkout_session = create_order_checkout_session(
+            order=refreshed_order,
+            customer_email=current_user.email,
+        )
+        checkout_url = stripe_get(checkout_session, "url")
+        if not checkout_url:
+            raise RuntimeError("Stripe checkout session did not return a URL.")
 
-    await update_order_payment_fields(
-        db,
-        refreshed_order,
-        stripe_checkout_session_id=str(checkout_session_id),
-        stripe_checkout_url=str(checkout_url),
-        stripe_checkout_expires_at=checkout_expires_at,
-    )
-    await db.commit()
+        checkout_session_id = stripe_get(checkout_session, "id")
+        if not checkout_session_id:
+            raise RuntimeError("Stripe checkout session did not return an ID.")
+        checkout_expires_at = datetime_from_stripe_timestamp(
+            stripe_get(checkout_session, "expires_at")
+        )
+
+        await update_order_payment_fields(
+            db,
+            refreshed_order,
+            stripe_checkout_session_id=str(checkout_session_id),
+            stripe_checkout_url=str(checkout_url),
+            stripe_checkout_expires_at=checkout_expires_at,
+        )
+        await db.commit()
+
+    except Exception:
+        await db.rollback()
+        raise
 
     created = await get_order_by_id(db, order.id)
     if created is None:
@@ -334,6 +390,7 @@ def order_can_continue_payment(order: Order) -> bool:
     return (
         order.status == OrderStatus.PROCESSING.value
         and order.payment_status == PaymentStatus.PENDING.value
+        and order.stock_reservation_status == StockReservationStatus.RESERVED.value
     )
 
 
@@ -413,6 +470,9 @@ async def cancel_customer_order(
         raise ValueError("Only pending payment orders can be cancelled.")
 
     cancelled_at = datetime.now(UTC)
+
+    await release_order_stock_reservation(db, order)
+
     order.status = OrderStatus.CANCELLED.value
     order.cancelled_at = cancelled_at
     await update_order_payment_fields(
@@ -536,6 +596,12 @@ async def update_owner_order_status(
     elif payload.status == OrderStatus.DELIVERED:
         order.delivered_at = status_at
     elif payload.status == OrderStatus.CANCELLED:
+        if (
+            order.payment_status == PaymentStatus.PENDING.value
+            and order.stock_reservation_status == StockReservationStatus.RESERVED.value
+        ):
+            await release_order_stock_reservation(db, order)
+
         order.cancelled_at = status_at
 
     await create_order_status_event(

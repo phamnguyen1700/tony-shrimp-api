@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.auth import User
 from app.models.catalog import Shrimp, ShrimpVariant
-from app.models.order import Order, OrderItem, OrderStatusEvent
+from app.models.order import Order, OrderItem, OrderStatusEvent, StockReservationStatus
 
 
 async def get_variant_for_order(
@@ -222,6 +222,55 @@ async def decrement_variant_stock(
             ShrimpVariant.stock_quantity >= quantity,
         )
         .values(stock_quantity=ShrimpVariant.stock_quantity - quantity)
+    )
+    await db.flush()
+    return bool((result.rowcount or 0) > 0)
+
+
+async def increment_variant_stock(
+    db: AsyncSession,
+    *,
+    variant_id: uuid.UUID,
+    quantity: int,
+) -> bool:
+    result = await db.execute(
+        update(ShrimpVariant)
+        .where(ShrimpVariant.id == variant_id)
+        .values(stock_quantity=ShrimpVariant.stock_quantity + quantity)
+    )
+    await db.flush()
+    return bool((result.rowcount or 0) > 0)
+
+
+async def release_stock_reservation_once(
+    db: AsyncSession,
+    *,
+    order_id: uuid.UUID,
+) -> bool:
+    result = await db.execute(
+        update(Order)
+        .where(
+            Order.id == order_id,
+            Order.stock_reservation_status == StockReservationStatus.RESERVED.value,
+        )
+        .values(stock_reservation_status=StockReservationStatus.RELEASED.value)
+    )
+    await db.flush()
+    return bool((result.rowcount or 0) > 0)
+
+
+async def consume_stock_reservation_once(
+    db: AsyncSession,
+    *,
+    order_id: uuid.UUID,
+) -> bool:
+    result = await db.execute(
+        update(Order)
+        .where(
+            Order.id == order_id,
+            Order.stock_reservation_status == StockReservationStatus.RESERVED.value,
+        )
+        .values(stock_reservation_status=StockReservationStatus.CONSUMED.value)
     )
     await db.flush()
     return bool((result.rowcount or 0) > 0)

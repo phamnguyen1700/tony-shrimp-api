@@ -12,6 +12,9 @@ from app.repositories.order.order_repository import (
     list_pending_payment_orders_older_than,
     list_orders,
     update_order_payment_fields,
+    increment_variant_stock,
+    release_stock_reservation_once,
+    consume_stock_reservation_once,
 )
 
 __all__ = [
@@ -28,4 +31,7 @@ __all__ = [
     "list_pending_payment_orders_older_than",
     "list_orders",
     "update_order_payment_fields",
+    "increment_variant_stock",
+    "release_stock_reservation_once",
+    "consume_stock_reservation_once",
 ]
