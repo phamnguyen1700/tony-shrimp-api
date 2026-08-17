@@ -214,15 +214,17 @@ async def decrement_variant_stock(
     *,
     variant_id: uuid.UUID,
     quantity: int,
-) -> None:
-    await db.execute(
+) -> bool:
+    result = await db.execute(
         update(ShrimpVariant)
-        .where(ShrimpVariant.id == variant_id)
-        .values(
-            stock_quantity=func.greatest(ShrimpVariant.stock_quantity - quantity, 0)
+        .where(
+            ShrimpVariant.id == variant_id,
+            ShrimpVariant.stock_quantity >= quantity,
         )
+        .values(stock_quantity=ShrimpVariant.stock_quantity - quantity)
     )
     await db.flush()
+    return bool((result.rowcount or 0) > 0)
 
 
 async def list_pending_payment_orders_older_than(
@@ -279,7 +281,10 @@ async def list_orders(
         query = query.join(User)
 
     result = await db.execute(
-        query.where(*filters).order_by(Order.created_at.desc()).limit(limit).offset(offset)
+        query.where(*filters)
+        .order_by(Order.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     return list(result.scalars().all())
 

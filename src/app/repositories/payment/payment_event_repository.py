@@ -20,6 +20,20 @@ async def get_payment_event_by_provider_event_id(
     return result.scalar_one_or_none()
 
 
+async def get_payment_event_by_provider_event_id_for_update(
+    db: AsyncSession,
+    provider_event_id: str,
+) -> PaymentEvent | None:
+    result = await db.execute(
+        select(PaymentEvent)
+        .where(
+            PaymentEvent.provider_event_id == provider_event_id,
+        )
+        .with_for_update()
+    )
+    return result.scalar_one_or_none()
+
+
 async def create_payment_event(
     db: AsyncSession,
     *,

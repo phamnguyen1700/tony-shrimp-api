@@ -45,6 +45,24 @@ from app.services.payment import create_order_checkout_session
 settings = get_settings()
 
 
+class CheckoutDomainError(ValueError):
+    def __init__(self, *, status_code: int, detail: object) -> None:
+        super().__init__(str(detail))
+        self.status_code = status_code
+        self.detail = detail
+
+
+class InsufficientStockCheckoutError(CheckoutDomainError):
+    def __init__(self, items: list[dict[str, object]]) -> None:
+        super().__init__(
+            status_code=409,
+            detail={
+                "error": "INSUFFICIENT_STOCK",
+                "items": items,
+            },
+        )
+
+
 def normalize_note(value: str | None) -> str | None:
     if value is None:
         return None
@@ -197,6 +215,7 @@ async def create_customer_order(
     quantities = aggregate_order_items(payload)
     variant_snapshots: list[tuple[ShrimpVariant, int, Decimal]] = []
     subtotal = Decimal("0.00")
+    insufficient_stock_items: list[dict[str, object]] = []
 
     for variant_id, quantity in quantities.items():
         variant = await get_variant_for_order(db, variant_id)
@@ -204,10 +223,22 @@ async def create_customer_order(
             raise ValueError("One or more variants are unavailable.")
         if variant.shrimp.catalog_status != CatalogStatus.ACTIVE.value:
             raise ValueError("One or more shrimp are unavailable.")
+        if variant.stock_quantity < quantity:
+            insufficient_stock_items.append(
+                {
+                    "variant_id": str(variant.id),
+                    "requested": quantity,
+                    "available": variant.stock_quantity,
+                }
+            )
+            continue
 
         line_total = variant.price * quantity
         subtotal += line_total
         variant_snapshots.append((variant, quantity, line_total))
+
+    if insufficient_stock_items:
+        raise InsufficientStockCheckoutError(insufficient_stock_items)
 
     shipping_amount = settings.order_shipping_flat_rate_amount
     total = subtotal + shipping_amount

@@ -1,4 +1,6 @@
 from app.services.order.order_service import (
+    CheckoutDomainError,
+    InsufficientStockCheckoutError,
     cancel_customer_order,
     continue_customer_order_payment,
     create_customer_order,
@@ -11,6 +13,8 @@ from app.services.order.order_service import (
 )
 
 __all__ = [
+    "CheckoutDomainError",
+    "InsufficientStockCheckoutError",
     "cancel_customer_order",
     "continue_customer_order_payment",
     "create_customer_order",

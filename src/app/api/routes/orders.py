@@ -12,6 +12,7 @@ from app.schemas.order import (
     OrderListResponse,
 )
 from app.services.order import (
+    CheckoutDomainError,
     cancel_customer_order,
     continue_customer_order_payment,
     create_customer_order,
@@ -39,8 +40,12 @@ async def create_order_checkout(
             current_user=current_user,
             payload=payload,
         )
+    except CheckoutDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
 @router.get("", response_model=OrderListResponse)
@@ -71,7 +76,9 @@ async def get_my_order_by_payment_session(
             stripe_session_id=session_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.get("/{order_id}", response_model=OrderDetailResponse)
@@ -87,7 +94,9 @@ async def get_my_order(
             order_id=order_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.post("/{order_id}/continue-payment", response_model=CheckoutOrderResponse)
@@ -103,7 +112,9 @@ async def continue_my_order_payment(
             order_id=order_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
 @router.post("/{order_id}/cancel", response_model=OrderDetailResponse)
@@ -119,4 +130,6 @@ async def cancel_my_order(
             order_id=order_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc

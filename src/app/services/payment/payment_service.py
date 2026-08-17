@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.auth import UserRole
@@ -19,11 +20,12 @@ from app.repositories.order import (
     get_order_by_id,
     get_order_by_stripe_checkout_session_id,
     get_order_by_stripe_payment_intent_id,
+    get_variant_for_order,
     update_order_payment_fields,
 )
 from app.repositories.payment import (
     create_payment_event,
-    get_payment_event_by_provider_event_id,
+    get_payment_event_by_provider_event_id_for_update,
     mark_payment_event_processed,
 )
 from app.services.notification import (
@@ -76,6 +78,12 @@ def get_metadata_order_id(stripe_object: Any) -> uuid.UUID | None:
         return None
 
 
+class StockAllocationAfterPaymentError(RuntimeError):
+    def __init__(self, items: list[dict[str, object]]) -> None:
+        super().__init__("Insufficient stock while allocating paid order.")
+        self.items = items
+
+
 async def notify_paid_order(db: AsyncSession, order: Order) -> None:
     notifications = []
     for role in (UserRole.OWNER.value, UserRole.ADMIN.value):
@@ -96,16 +104,62 @@ async def notify_paid_order(db: AsyncSession, order: Order) -> None:
     await publish_notifications(notifications)
 
 
-async def decrement_stock_for_paid_order(db: AsyncSession, order: Order) -> None:
-    for item in order.items:
-        if item.variant_id is None:
-            continue
-
-        await decrement_variant_stock(
-            db,
-            variant_id=item.variant_id,
-            quantity=item.quantity,
+async def notify_stock_allocation_failed(
+    db: AsyncSession,
+    order: Order,
+    items: list[dict[str, object]],
+) -> None:
+    notifications = []
+    for role in (UserRole.OWNER.value, UserRole.ADMIN.value):
+        notifications.append(
+            await create_notification_for_audience(
+                db,
+                recipient_role=role,
+                type=NotificationType.NEW_ORDER.value,
+                title=f"Manual stock review needed for {order.order_number}",
+                message="Payment succeeded but stock allocation failed for one or more items.",
+                data={
+                    "order_id": str(order.id),
+                    "order_number": order.order_number,
+                    "issue": "post_payment_stock_allocation_failed",
+                    "items": items,
+                },
+            )
         )
+
+    await publish_notifications(notifications)
+
+
+async def decrement_stock_for_paid_order(db: AsyncSession, order: Order) -> None:
+    insufficient_stock_items: list[dict[str, object]] = []
+
+    # Keep decrement operations in a nested transaction so we can rollback any
+    # partial decrements when one item fails allocation.
+    async with db.begin_nested():
+        for item in order.items:
+            if item.variant_id is None:
+                continue
+
+            updated = await decrement_variant_stock(
+                db,
+                variant_id=item.variant_id,
+                quantity=item.quantity,
+            )
+            if updated:
+                continue
+
+            variant = await get_variant_for_order(db, item.variant_id)
+            available = variant.stock_quantity if variant is not None else 0
+            insufficient_stock_items.append(
+                {
+                    "variant_id": str(item.variant_id),
+                    "requested": item.quantity,
+                    "available": available,
+                }
+            )
+
+        if insufficient_stock_items:
+            raise StockAllocationAfterPaymentError(insufficient_stock_items)
 
 
 async def find_order_for_checkout_session(
@@ -138,14 +192,41 @@ async def handle_checkout_completed(
         return None
 
     payment_intent_id = stripe_get(stripe_session, "payment_intent")
-    await decrement_stock_for_paid_order(db, order)
+    paid_at = datetime.now(UTC)
+
+    try:
+        await decrement_stock_for_paid_order(db, order)
+    except StockAllocationAfterPaymentError as exc:
+        await update_order_payment_fields(
+            db,
+            order,
+            payment_status=PaymentStatus.PAID.value,
+            stripe_checkout_session_id=str(session_id),
+            stripe_payment_intent_id=(
+                str(payment_intent_id) if payment_intent_id else None
+            ),
+            paid_at=paid_at,
+        )
+        await create_order_status_event(
+            db,
+            order_id=order.id,
+            status=OrderStatus.PROCESSING.value,
+            message=(
+                "Payment received but stock allocation failed for one or more "
+                "items. Manual review required."
+            ),
+            created_by_user_id=None,
+        )
+        await notify_stock_allocation_failed(db, order, exc.items)
+        return order
+
     await update_order_payment_fields(
         db,
         order,
         payment_status=PaymentStatus.PAID.value,
         stripe_checkout_session_id=str(session_id),
         stripe_payment_intent_id=str(payment_intent_id) if payment_intent_id else None,
-        paid_at=datetime.now(UTC),
+        paid_at=paid_at,
     )
     await create_order_status_event(
         db,
@@ -255,7 +336,10 @@ async def handle_stripe_webhook_event(
     event: Any,
 ) -> None:
     provider_event_id = get_stripe_event_id(event)
-    existing_event = await get_payment_event_by_provider_event_id(db, provider_event_id)
+    existing_event = await get_payment_event_by_provider_event_id_for_update(
+        db,
+        provider_event_id,
+    )
     if existing_event is not None and existing_event.processed_at is not None:
         return
 
@@ -265,14 +349,25 @@ async def handle_stripe_webhook_event(
 
     payment_event = existing_event
     if payment_event is None:
-        payment_event = await create_payment_event(
-            db,
-            provider=PaymentProvider.STRIPE.value,
-            provider_event_id=provider_event_id,
-            event_type=event_type,
-            payload=stripe_object_to_dict(event),
-            order_id=order_id,
-        )
+        try:
+            payment_event = await create_payment_event(
+                db,
+                provider=PaymentProvider.STRIPE.value,
+                provider_event_id=provider_event_id,
+                event_type=event_type,
+                payload=stripe_object_to_dict(event),
+                order_id=order_id,
+            )
+        except IntegrityError:
+            await db.rollback()
+            payment_event = await get_payment_event_by_provider_event_id_for_update(
+                db,
+                provider_event_id,
+            )
+            if payment_event is None:
+                raise RuntimeError("Stripe payment event could not be loaded.")
+            if payment_event.processed_at is not None:
+                return
 
     handled_order = None
     if event_type == "checkout.session.completed":
