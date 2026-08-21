@@ -329,10 +329,18 @@ def get_realtime_analytics(
                 metrics=[Metric(name="activeUsers")],
             )
         )
+    except GoogleAPIError as exc:
+        raise GoogleAnalyticsUnavailableError(str(exc)) from exc
+
+    active_rows = list(getattr(active_response, "rows", []) or [])
+    active_users = parse_int(get_metric(active_rows[0], 0)) if active_rows else 0
+    top_active_pages: list[AnalyticsTopActivePageResponse] = []
+
+    try:
         top_pages_response = ga_client.run_realtime_report(
             RunRealtimeReportRequest(
                 property=get_ga_property_name(),
-                dimensions=[Dimension(name="unifiedPagePathScreen")],
+                dimensions=[Dimension(name="unifiedScreenName")],
                 metrics=[Metric(name="activeUsers")],
                 limit=10,
                 order_bys=[
@@ -343,21 +351,19 @@ def get_realtime_analytics(
                 ],
             )
         )
-    except GoogleAPIError as exc:
-        raise GoogleAnalyticsUnavailableError(str(exc)) from exc
-
-    active_rows = list(getattr(active_response, "rows", []) or [])
-    active_users = parse_int(get_metric(active_rows[0], 0)) if active_rows else 0
-
-    return AnalyticsRealtimeResponse(
-        active_users=active_users,
-        top_active_pages=[
+        top_active_pages = [
             AnalyticsTopActivePageResponse(
                 path=get_dimension(row, 0) or "/",
                 active_users=parse_int(get_metric(row, 0)),
             )
             for row in getattr(top_pages_response, "rows", []) or []
-        ],
+        ]
+    except GoogleAPIError:
+        top_active_pages = []
+
+    return AnalyticsRealtimeResponse(
+        active_users=active_users,
+        top_active_pages=top_active_pages,
     )
 
 

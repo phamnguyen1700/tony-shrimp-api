@@ -3,6 +3,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
+from google.api_core.exceptions import InvalidArgument
 
 from app.repositories.analytics import OrderAnalyticsTotals
 from app.services.analytics import google_analytics_service
@@ -56,6 +57,18 @@ class FakeRealtimeClient:
         )
 
 
+class FakeRealtimeTopPagesErrorClient:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def run_realtime_report(self, _request):
+        self.calls += 1
+        if self.calls == 1:
+            return response([row(metrics=[12])])
+
+        raise InvalidArgument("Unsupported realtime dimension.")
+
+
 class FakeTrafficClient:
     def run_report(self, request):
         dimensions = tuple(dimension.name for dimension in request.dimensions)
@@ -107,6 +120,19 @@ def test_realtime_analytics_returns_active_users_and_top_pages(
     assert result.top_active_pages[0].active_users == 184
 
 
+def test_realtime_analytics_keeps_active_users_when_top_pages_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_ga(monkeypatch)
+
+    result = google_analytics_service.get_realtime_analytics(
+        client=FakeRealtimeTopPagesErrorClient()
+    )
+
+    assert result.active_users == 12
+    assert result.top_active_pages == []
+
+
 def test_traffic_analytics_returns_summary_sources_pages_and_conversion(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -154,4 +180,3 @@ def test_missing_google_analytics_config_raises(
 
     with pytest.raises(google_analytics_service.GoogleAnalyticsUnavailableError):
         google_analytics_service.get_realtime_analytics(client=FakeRealtimeClient())
-
