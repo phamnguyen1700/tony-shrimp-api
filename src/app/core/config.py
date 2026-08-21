@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     order_currency: str = "AUD"
     business_timezone: str = "Australia/Sydney"
 
+    ga_property_id: str = ""
+    google_service_account_json: str = ""
+
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_currency: str = "aud"
