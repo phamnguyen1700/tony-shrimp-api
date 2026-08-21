@@ -6,6 +6,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.catalog import router as catalog_router
 from app.api.routes.orders import router as orders_router
 from app.api.routes.owner_catalog import router as owner_catalog_router
+from app.api.routes.owner_analytics import router as owner_analytics_router
 from app.api.routes.owner_notifications import router as owner_notifications_router
 from app.api.routes.owner_orders import router as owner_orders_router
 from app.api.routes.owner_users import router as owner_users_router
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(catalog_router)
     app.include_router(orders_router)
     app.include_router(owner_catalog_router)
+    app.include_router(owner_analytics_router)
     app.include_router(owner_notifications_router)
     app.include_router(owner_orders_router)
     app.include_router(owner_users_router)

@@ -57,6 +57,7 @@ class Settings(BaseSettings):
 
     order_shipping_flat_rate_amount: Decimal = Decimal("25.00")
     order_currency: str = "AUD"
+    business_timezone: str = "Australia/Sydney"
 
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""

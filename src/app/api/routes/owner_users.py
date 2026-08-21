@@ -41,6 +41,7 @@ def map_user_management_error(exc: Exception) -> HTTPException:
 async def list_owner_user_accounts(
     search: str | None = Query(default=None),
     role: UserRole | None = Query(default=None),
+    role_in: str | None = Query(default=None),
     user_status: UserStatus | None = Query(default=None, alias="status"),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -52,6 +53,7 @@ async def list_owner_user_accounts(
         actor=current_user,
         search=search,
         role=role,
+        role_in=role_in,
         status=user_status,
         limit=limit,
         offset=offset,

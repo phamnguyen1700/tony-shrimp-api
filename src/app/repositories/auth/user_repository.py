@@ -52,6 +52,7 @@ def build_user_list_filters(
     *,
     search: str | None = None,
     role: str | None = None,
+    role_in: list[str] | None = None,
     status: str | None = None,
 ) -> list[object]:
     filters: list[object] = []
@@ -68,6 +69,9 @@ def build_user_list_filters(
     if role:
         filters.append(User.role == role)
 
+    if role_in:
+        filters.append(User.role.in_(role_in))
+
     if status:
         filters.append(User.status == status)
 
@@ -79,11 +83,17 @@ async def list_users(
     *,
     search: str | None = None,
     role: str | None = None,
+    role_in: list[str] | None = None,
     status: str | None = None,
     limit: int = 20,
     offset: int = 0,
 ) -> list[User]:
-    filters = build_user_list_filters(search=search, role=role, status=status)
+    filters = build_user_list_filters(
+        search=search,
+        role=role,
+        role_in=role_in,
+        status=status,
+    )
     query = select(User).options(selectinload(User.profile))
     if search:
         query = query.outerjoin(UserProfile)
@@ -103,9 +113,15 @@ async def count_users(
     *,
     search: str | None = None,
     role: str | None = None,
+    role_in: list[str] | None = None,
     status: str | None = None,
 ) -> int:
-    filters = build_user_list_filters(search=search, role=role, status=status)
+    filters = build_user_list_filters(
+        search=search,
+        role=role,
+        role_in=role_in,
+        status=status,
+    )
     query = select(func.count()).select_from(User)
     if search:
         query = query.outerjoin(UserProfile)

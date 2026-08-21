@@ -58,13 +58,19 @@ async def list_owner_users(
     actor: User,
     search: str | None = None,
     role: UserRole | None = None,
+    role_in: str | None = None,
     status: UserStatus | None = None,
     limit: int = 20,
     offset: int = 0,
 ) -> OwnerUserListResponse:
     role_value = role.value if role else None
-    if actor.role == UserRole.OWNER.value:
-        role_value = UserRole.CUSTOMER.value
+    role_values = [
+        value.strip()
+        for value in (role_in or "").split(",")
+        if value.strip() in {role.value for role in UserRole}
+    ]
+    if role_value:
+        role_values = []
 
     status_value = status.value if status else None
 
@@ -72,6 +78,7 @@ async def list_owner_users(
         db,
         search=search,
         role=role_value,
+        role_in=role_values or None,
         status=status_value,
         limit=limit,
         offset=offset,
@@ -80,6 +87,7 @@ async def list_owner_users(
         db,
         search=search,
         role=role_value,
+        role_in=role_values or None,
         status=status_value,
     )
 
@@ -100,9 +108,6 @@ async def get_owner_user_detail(
     user = await get_user_detail_by_id(db, user_id)
     if user is None:
         raise ValueError("User not found.")
-
-    if actor.role == UserRole.OWNER.value and user.role != UserRole.CUSTOMER.value:
-        raise PermissionError("Owner can only view customer accounts.")
 
     return build_owner_user_detail(user)
 
