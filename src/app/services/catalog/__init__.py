@@ -1,4 +1,7 @@
-from app.services.catalog.options_service import get_catalog_options
+from app.services.catalog.options_service import (
+    get_catalog_filter_options,
+    get_catalog_options,
+)
 from app.services.catalog.owner_service import (
     add_shrimp_image,
     add_shrimp_variant,
@@ -29,6 +32,7 @@ __all__ = [
     "edit_shrimp_image",
     "edit_shrimp_variant",
     "get_catalog_options",
+    "get_catalog_filter_options",
     "get_shrimp_catalog_item",
     "get_shrimp_catalog_item_by_slug",
     "is_shrimp_available",

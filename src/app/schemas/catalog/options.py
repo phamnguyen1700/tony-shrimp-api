@@ -10,3 +10,13 @@ class CatalogOptionsResponse(BaseModel):
     grades: list[str]
     rarities: list[str]
     traits: list[str]
+
+
+class CatalogFilterOptionsResponse(BaseModel):
+    species: list[str]
+    lines: list[str]
+    colors: list[str]
+    grades: list[str]
+    rarities: list[str]
+    traits: list[str]
+    availability: list[str]

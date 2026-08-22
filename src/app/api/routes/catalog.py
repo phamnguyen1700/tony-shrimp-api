@@ -7,11 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_db_session
 from app.models.catalog import CatalogStatus
 from app.schemas.catalog import (
+    CatalogFilterOptionsResponse,
     CatalogOptionsResponse,
     ShrimpDetailResponse,
     ShrimpListItemResponse,
 )
 from app.services.catalog import (
+    get_catalog_filter_options,
     get_catalog_options,
     get_shrimp_catalog_item,
     get_shrimp_catalog_item_by_slug,
@@ -26,6 +28,35 @@ async def get_public_catalog_options(
     db: AsyncSession = Depends(get_db_session),
 ) -> CatalogOptionsResponse:
     return await get_catalog_options(db, active_only=True)
+
+
+@router.get("/shrimp/filter-options", response_model=CatalogFilterOptionsResponse)
+async def get_public_shrimp_filter_options(
+    search: str | None = Query(default=None),
+    species: str | None = Query(default=None),
+    line: str | None = Query(default=None),
+    color: str | None = Query(default=None),
+    grade: str | None = Query(default=None),
+    rarity: str | None = Query(default=None),
+    trait: str | None = Query(default=None),
+    min_price: Decimal | None = Query(default=None, ge=0),
+    max_price: Decimal | None = Query(default=None, ge=0),
+    in_stock: bool | None = Query(default=None),
+    db: AsyncSession = Depends(get_db_session),
+) -> CatalogFilterOptionsResponse:
+    return await get_catalog_filter_options(
+        db,
+        search=search,
+        species=species,
+        line=line,
+        color=color,
+        grade=grade,
+        rarity=rarity,
+        trait=trait,
+        min_price=min_price,
+        max_price=max_price,
+        in_stock=in_stock,
+    )
 
 
 @router.get("/shrimp", response_model=list[ShrimpListItemResponse])

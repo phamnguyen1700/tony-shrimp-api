@@ -20,6 +20,7 @@ from app.repositories.catalog.shrimp_repository import (
     get_shrimp_by_id,
     get_shrimp_by_slug,
     list_shrimp,
+    list_shrimp_for_filter_options,
     update_shrimp,
 )
 from app.repositories.catalog.shrimp_variant_repository import (
@@ -46,6 +47,7 @@ __all__ = [
     "list_distinct_scalar_values",
     "list_distinct_traits",
     "list_shrimp",
+    "list_shrimp_for_filter_options",
     "update_care_parameter",
     "update_shrimp",
     "update_shrimp_image",

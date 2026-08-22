@@ -3,7 +3,7 @@ from app.schemas.catalog.care_parameter import (
     CareParameterResponse,
     CareParameterUpdate,
 )
-from app.schemas.catalog.options import CatalogOptionsResponse
+from app.schemas.catalog.options import CatalogFilterOptionsResponse, CatalogOptionsResponse
 from app.schemas.catalog.shrimp import (
     ShrimpCreate,
     ShrimpDetailResponse,
@@ -26,6 +26,7 @@ __all__ = [
     "CareParameterResponse",
     "CareParameterUpdate",
     "CatalogOptionsResponse",
+    "CatalogFilterOptionsResponse",
     "ShrimpCreate",
     "ShrimpDetailResponse",
     "ShrimpImageCreate",
