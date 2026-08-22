@@ -104,6 +104,8 @@ def to_shrimp_list_item_response(shrimp: Shrimp) -> ShrimpListItemResponse:
         grade=shrimp.grade,
         rarity=shrimp.rarity,
         description=shrimp.description,
+        meta_title=shrimp.meta_title,
+        meta_description=shrimp.meta_description,
         catalog_status=shrimp.catalog_status,
         traits=shrimp.traits,
         created_at=shrimp.created_at,
@@ -129,6 +131,8 @@ def to_shrimp_detail_response(shrimp: Shrimp) -> ShrimpDetailResponse:
         grade=shrimp.grade,
         rarity=shrimp.rarity,
         description=shrimp.description,
+        meta_title=shrimp.meta_title,
+        meta_description=shrimp.meta_description,
         catalog_status=shrimp.catalog_status,
         traits=shrimp.traits,
         created_at=shrimp.created_at,
@@ -198,6 +202,8 @@ async def create_shrimp_catalog_item(
         grade=payload.grade,
         rarity=payload.rarity,
         description=payload.description,
+        meta_title=payload.meta_title,
+        meta_description=payload.meta_description,
         catalog_status=payload.catalog_status.value,
         traits=payload.traits,
     )
@@ -286,6 +292,7 @@ async def list_shrimp_catalog_items(
     *,
     catalog_status: str | None = None,
     search: str | None = None,
+    species: str | None = None,
     line: str | None = None,
     color: str | None = None,
     grade: str | None = None,
@@ -301,6 +308,7 @@ async def list_shrimp_catalog_items(
         db,
         catalog_status=catalog_status,
         search=search,
+        species=species,
         line=line,
         color=color,
         grade=grade,
@@ -344,9 +352,16 @@ async def update_shrimp_catalog_item(
         grade=payload.grade,
         rarity=payload.rarity,
         description=payload.description,
+        meta_title=payload.meta_title,
+        meta_description=payload.meta_description,
         catalog_status=payload.catalog_status.value if payload.catalog_status else None,
         traits=payload.traits,
     )
+    if "meta_title" in payload.model_fields_set:
+        shrimp.meta_title = payload.meta_title
+    if "meta_description" in payload.model_fields_set:
+        shrimp.meta_description = payload.meta_description
+
     await db.commit()
 
     updated = await get_shrimp_by_id(db, shrimp.id)

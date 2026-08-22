@@ -64,6 +64,14 @@ class Shrimp(Base):
         Text,
         nullable=True,
     )
+    meta_title: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    meta_description: Mapped[str | None] = mapped_column(
+        String(320),
+        nullable=True,
+    )
     catalog_status: Mapped[str] = mapped_column(
         String(32),
         nullable=False,

@@ -19,6 +19,8 @@ async def create_shrimp(
     grade: str | None = None,
     rarity: str | None = None,
     description: str | None = None,
+    meta_title: str | None = None,
+    meta_description: str | None = None,
     catalog_status: str,
     traits: list[str] | None = None,
 ) -> Shrimp:
@@ -31,6 +33,8 @@ async def create_shrimp(
         grade=grade,
         rarity=rarity,
         description=description,
+        meta_title=meta_title,
+        meta_description=meta_description,
         catalog_status=catalog_status,
         traits=traits or [],
     )
@@ -76,6 +80,7 @@ async def list_shrimp(
     *,
     catalog_status: str | None = None,
     search: str | None = None,
+    species: str | None = None,
     line: str | None = None,
     color: str | None = None,
     grade: str | None = None,
@@ -97,6 +102,8 @@ async def list_shrimp(
         statement = statement.where(Shrimp.catalog_status == catalog_status)
     if search:
         statement = statement.where(Shrimp.name.ilike(f"%{search}%"))
+    if species is not None:
+        statement = statement.where(Shrimp.species == species)
     if line is not None:
         statement = statement.where(Shrimp.line == line)
     if color is not None:
@@ -139,6 +146,8 @@ async def update_shrimp(
     grade: str | None = None,
     rarity: str | None = None,
     description: str | None = None,
+    meta_title: str | None = None,
+    meta_description: str | None = None,
     catalog_status: str | None = None,
     traits: list[str] | None = None,
 ) -> Shrimp:
@@ -158,6 +167,10 @@ async def update_shrimp(
         shrimp.rarity = rarity
     if description is not None:
         shrimp.description = description
+    if meta_title is not None:
+        shrimp.meta_title = meta_title
+    if meta_description is not None:
+        shrimp.meta_description = meta_description
     if catalog_status is not None:
         shrimp.catalog_status = catalog_status
     if traits is not None:

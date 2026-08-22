@@ -30,6 +30,8 @@ class ShrimpCreate(BaseModel):
     grade: str | None = Field(default=None, max_length=64)
     rarity: str | None = Field(default=None, max_length=64)
     description: str | None = None
+    meta_title: str | None = Field(default=None, max_length=255)
+    meta_description: str | None = Field(default=None, max_length=320)
     catalog_status: CatalogStatus = CatalogStatus.INACTIVE
     traits: list[str] = Field(default_factory=list)
 
@@ -52,6 +54,8 @@ class ShrimpUpdate(BaseModel):
     grade: str | None = Field(default=None, max_length=64)
     rarity: str | None = Field(default=None, max_length=64)
     description: str | None = None
+    meta_title: str | None = Field(default=None, max_length=255)
+    meta_description: str | None = Field(default=None, max_length=320)
     catalog_status: CatalogStatus | None = None
     traits: list[str] | None = None
 
@@ -66,6 +70,8 @@ class ShrimpListItemResponse(BaseModel):
     grade: str | None
     rarity: str | None
     description: str | None
+    meta_title: str | None
+    meta_description: str | None
     catalog_status: str
     traits: list[str]
     created_at: datetime
@@ -87,6 +93,8 @@ class ShrimpDetailResponse(BaseModel):
     grade: str | None
     rarity: str | None
     description: str | None
+    meta_title: str | None
+    meta_description: str | None
     catalog_status: str
     traits: list[str]
     created_at: datetime

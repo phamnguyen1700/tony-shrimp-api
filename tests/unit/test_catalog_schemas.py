@@ -61,6 +61,8 @@ def test_shrimp_list_item_includes_raw_description() -> None:
         grade="SSS",
         rarity="rare",
         description=description,
+        meta_title=None,
+        meta_description=None,
         catalog_status=CatalogStatus.ACTIVE.value,
         traits=["boa"],
         created_at=datetime.now(UTC),
