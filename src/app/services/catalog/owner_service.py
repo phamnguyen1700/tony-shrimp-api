@@ -171,13 +171,21 @@ async def add_shrimp_image(
 
     is_primary = len(shrimp.images) == 0
 
+    requested_sort_order = max(0, min(payload.sort_order, MAX_SHRIMP_IMAGES - 1))
+    next_sort_order = 0
+    for image in sorted(shrimp.images, key=lambda item: (item.sort_order, item.created_at)):
+        if next_sort_order == requested_sort_order:
+            next_sort_order += 1
+        image.sort_order = next_sort_order
+        next_sort_order += 1
+
     await create_shrimp_image(
         db,
         shrimp_id=shrimp_id,
         r2_key=payload.r2_key,
         url=str(payload.url) if payload.url else None,
         alt_text=payload.alt_text,
-        sort_order=len(shrimp.images),
+        sort_order=requested_sort_order,
         is_primary=is_primary,
     )
     await db.commit()
