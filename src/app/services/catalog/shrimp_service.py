@@ -18,6 +18,7 @@ from app.repositories.catalog import (
 )
 from app.schemas.catalog import (
     CareParameterResponse,
+    OwnerShrimpListItemResponse,
     ShrimpCreate,
     ShrimpDetailResponse,
     ShrimpImageResponse,
@@ -61,6 +62,19 @@ def get_primary_image(shrimp: Shrimp):
     return sorted_images[0] if sorted_images else None
 
 
+def to_shrimp_image_response(image, primary_image) -> ShrimpImageResponse:
+    return ShrimpImageResponse(
+        id=image.id,
+        shrimp_id=image.shrimp_id,
+        r2_key=image.r2_key,
+        url=image.url,
+        alt_text=image.alt_text,
+        sort_order=image.sort_order,
+        is_primary=primary_image is not None and image.id == primary_image.id,
+        created_at=image.created_at,
+    )
+
+
 def get_care_level(shrimp: Shrimp) -> str | None:
     if shrimp.care_parameter is None:
         return None
@@ -94,6 +108,8 @@ async def create_unique_shrimp_slug(
 
 
 def to_shrimp_list_item_response(shrimp: Shrimp) -> ShrimpListItemResponse:
+    primary_image = get_primary_image(shrimp)
+
     return ShrimpListItemResponse(
         id=shrimp.id,
         name=shrimp.name,
@@ -113,8 +129,20 @@ def to_shrimp_list_item_response(shrimp: Shrimp) -> ShrimpListItemResponse:
         is_available=is_shrimp_available(shrimp),
         min_price=get_min_price(shrimp),
         total_stock=get_total_stock(shrimp),
-        primary_image_url=get_primary_image_url(shrimp),
+        primary_image_url=primary_image.url if primary_image is not None else None,
         care_level=get_care_level(shrimp),
+    )
+
+
+def to_owner_shrimp_list_item_response(shrimp: Shrimp) -> OwnerShrimpListItemResponse:
+    primary_image = get_primary_image(shrimp)
+
+    return OwnerShrimpListItemResponse(
+        **to_shrimp_list_item_response(shrimp).model_dump(),
+        images=[
+            to_shrimp_image_response(image, primary_image)
+            for image in get_sorted_images(shrimp)
+        ],
     )
 
 
@@ -173,16 +201,7 @@ def to_shrimp_detail_response(shrimp: Shrimp) -> ShrimpDetailResponse:
             else None
         ),
         images=[
-            ShrimpImageResponse(
-                id=image.id,
-                shrimp_id=image.shrimp_id,
-                r2_key=image.r2_key,
-                url=image.url,
-                alt_text=image.alt_text,
-                sort_order=image.sort_order,
-                is_primary=primary_image is not None and image.id == primary_image.id,
-                created_at=image.created_at,
-            )
+            to_shrimp_image_response(image, primary_image)
             for image in get_sorted_images(shrimp)
         ],
     )
@@ -322,6 +341,43 @@ async def list_shrimp_catalog_items(
     )
 
     return [to_shrimp_list_item_response(shrimp) for shrimp in shrimp_items]
+
+
+async def list_owner_shrimp_catalog_items(
+    db: AsyncSession,
+    *,
+    catalog_status: str | None = None,
+    search: str | None = None,
+    species: str | None = None,
+    line: str | None = None,
+    color: str | None = None,
+    grade: str | None = None,
+    rarity: str | None = None,
+    trait: str | None = None,
+    min_price: Decimal | None = None,
+    max_price: Decimal | None = None,
+    in_stock: bool | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[OwnerShrimpListItemResponse]:
+    shrimp_items = await list_shrimp(
+        db,
+        catalog_status=catalog_status,
+        search=search,
+        species=species,
+        line=line,
+        color=color,
+        grade=grade,
+        rarity=rarity,
+        trait=trait,
+        min_price=min_price,
+        max_price=max_price,
+        in_stock=in_stock,
+        limit=limit,
+        offset=offset,
+    )
+
+    return [to_owner_shrimp_list_item_response(shrimp) for shrimp in shrimp_items]
 
 
 async def update_shrimp_catalog_item(
