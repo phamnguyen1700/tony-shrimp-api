@@ -44,6 +44,10 @@ from app.schemas.order import (
     OrderStatusEventResponse,
     UpdateOrderStatusRequest,
 )
+from app.services.catalog.premium_policy import (
+    HIGH_QUALITY_CONTACT_MESSAGE,
+    is_high_quality_grade,
+)
 from app.services.payment import create_order_checkout_session
 
 settings = get_settings()
@@ -62,6 +66,18 @@ class InsufficientStockCheckoutError(CheckoutDomainError):
             status_code=409,
             detail={
                 "error": "INSUFFICIENT_STOCK",
+                "items": items,
+            },
+        )
+
+
+class ContactOnlyCheckoutError(CheckoutDomainError):
+    def __init__(self, items: list[dict[str, object]]) -> None:
+        super().__init__(
+            status_code=400,
+            detail={
+                "error": "CONTACT_ONLY_ITEM",
+                "message": HIGH_QUALITY_CONTACT_MESSAGE,
                 "items": items,
             },
         )
@@ -246,12 +262,21 @@ async def create_customer_order(
     subtotal = Decimal("0.00")
 
     insufficient_stock_items: list[dict[str, object]] = []
+    contact_only_items: list[dict[str, object]] = []
     for variant_id, quantity in quantities.items():
         variant = await get_variant_for_order(db, variant_id)
         if variant is None or not variant.is_active:
             raise ValueError("One or more variants are unavailable.")
         if variant.shrimp.catalog_status != CatalogStatus.ACTIVE.value:
             raise ValueError("One or more shrimp are unavailable.")
+        if is_high_quality_grade(variant.shrimp.grade):
+            contact_only_items.append(
+                {
+                    "variant_id": str(variant.id),
+                    "grade": variant.shrimp.grade,
+                }
+            )
+            continue
         if variant.stock_quantity < quantity:
             insufficient_stock_items.append(
                 {
@@ -265,6 +290,9 @@ async def create_customer_order(
         line_total = variant.price * quantity
         subtotal += line_total
         variant_snapshots.append((variant, quantity, line_total))
+
+    if contact_only_items:
+        raise ContactOnlyCheckoutError(contact_only_items)
 
     if insufficient_stock_items:
         raise InsufficientStockCheckoutError(insufficient_stock_items)

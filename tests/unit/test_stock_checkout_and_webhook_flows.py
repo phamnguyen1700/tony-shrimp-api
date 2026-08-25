@@ -17,7 +17,7 @@ def run_async(coro):
     return asyncio.run(coro)
 
 
-def make_variant(*, stock_quantity: int) -> SimpleNamespace:
+def make_variant(*, stock_quantity: int, grade: str | None = None) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid.uuid4(),
         is_active=True,
@@ -25,6 +25,7 @@ def make_variant(*, stock_quantity: int) -> SimpleNamespace:
         price=Decimal("50.00"),
         shrimp=SimpleNamespace(
             catalog_status=CatalogStatus.ACTIVE.value,
+            grade=grade,
             name="Red Boa",
             images=[],
         ),
@@ -260,6 +261,83 @@ def test_checkout_atomic_reservation_failure_returns_409_and_rolls_back(
         ],
     }
     assert db.rollback_calls == 1
+    assert create_order_called is False
+    assert stripe_called is False
+
+
+def test_checkout_rejects_high_quality_variant_before_order_creation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = make_user()
+    address = make_address()
+    variant = make_variant(stock_quantity=5, grade="SSS")
+    create_order_called = False
+    stripe_called = False
+    decrement_called = False
+
+    async def fake_get_user_address(*args, **kwargs):
+        return address
+
+    async def fake_get_variant_for_order(*args, **kwargs):
+        return variant
+
+    async def fake_decrement_variant_stock(*args, **kwargs):
+        nonlocal decrement_called
+        decrement_called = True
+        return True
+
+    async def fake_create_order(*args, **kwargs):
+        nonlocal create_order_called
+        create_order_called = True
+        return SimpleNamespace(id=uuid.uuid4(), created_at=datetime.now(UTC))
+
+    def fake_create_checkout_session(*args, **kwargs):
+        nonlocal stripe_called
+        stripe_called = True
+        return {"id": "cs_test", "url": "https://stripe.test/checkout"}
+
+    monkeypatch.setattr(order_service, "get_user_address", fake_get_user_address)
+    monkeypatch.setattr(
+        order_service, "get_variant_for_order", fake_get_variant_for_order
+    )
+    monkeypatch.setattr(
+        order_service,
+        "decrement_variant_stock",
+        fake_decrement_variant_stock,
+    )
+    monkeypatch.setattr(order_service, "create_order", fake_create_order)
+    monkeypatch.setattr(
+        order_service,
+        "create_order_checkout_session",
+        fake_create_checkout_session,
+    )
+
+    payload = CreateOrderRequest(
+        shipping_address_id=uuid.uuid4(),
+        items=[CreateOrderItemRequest(variant_id=variant.id, quantity=1)],
+    )
+
+    with pytest.raises(order_service.ContactOnlyCheckoutError) as exc_info:
+        run_async(
+            order_service.create_customer_order(
+                db=SimpleNamespace(),
+                current_user=user,
+                payload=payload,
+            )
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == {
+        "error": "CONTACT_ONLY_ITEM",
+        "message": "Please contact us for high quality product.",
+        "items": [
+            {
+                "variant_id": str(variant.id),
+                "grade": "SSS",
+            }
+        ],
+    }
+    assert decrement_called is False
     assert create_order_called is False
     assert stripe_called is False
 
