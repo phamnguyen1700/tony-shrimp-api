@@ -72,15 +72,15 @@ def test_public_catalog_route_exposes_and_threads_species(monkeypatch) -> None:
 def test_owner_catalog_route_exposes_and_threads_species(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
-    async def fake_list_shrimp_catalog_items(db, **kwargs):
+    async def fake_list_owner_shrimp_catalog_items(db, **kwargs):
         captured["db"] = db
         captured["kwargs"] = kwargs
         return []
 
     monkeypatch.setattr(
         owner_catalog,
-        "list_shrimp_catalog_items",
-        fake_list_shrimp_catalog_items,
+        "list_owner_shrimp_catalog_items",
+        fake_list_owner_shrimp_catalog_items,
     )
 
     signature = inspect.signature(owner_catalog.list_owner_shrimp)
@@ -424,6 +424,27 @@ def test_repository_supports_collection_rarity_list() -> None:
     assert result == []
     assert "shrimp.rarity IN (__[POSTCOMPILE_rarity_1])" in sql
     assert params["rarity_1"] == ["rare", "extremely rare"]
+    assert params["param_1"] == 24
+
+
+def test_repository_supports_collection_grade_list() -> None:
+    db = FakeDb()
+
+    result = run(
+        shrimp_repository.list_shrimp(
+            db,
+            catalog_status=CatalogStatus.ACTIVE.value,
+            grade="High Grade,SS,SSS",
+            limit=24,
+        )
+    )
+
+    sql = compile_statement(db.statement)
+    params = db.statement.compile().params
+
+    assert result == []
+    assert "shrimp.grade IN (__[POSTCOMPILE_grade_1])" in sql
+    assert params["grade_1"] == ["High Grade", "SS", "SSS"]
     assert params["param_1"] == 24
 
 

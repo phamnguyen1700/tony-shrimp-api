@@ -39,8 +39,11 @@ def apply_shrimp_filters(
         statement = statement.where(Shrimp.line == line)
     if color is not None:
         statement = statement.where(Shrimp.colors.contains([color]))
-    if grade is not None:
-        statement = statement.where(Shrimp.grade == grade)
+    grade_values = split_csv_filter(grade)
+    if len(grade_values) > 1:
+        statement = statement.where(Shrimp.grade.in_(grade_values))
+    elif grade_values:
+        statement = statement.where(Shrimp.grade == grade_values[0])
 
     rarity_values = split_csv_filter(rarity)
     if len(rarity_values) > 1:
