@@ -83,6 +83,10 @@ class ShrimpListItemResponse(BaseModel):
     care_level: str | None
 
 
+class OwnerShrimpListItemResponse(ShrimpListItemResponse):
+    images: list[ShrimpImageResponse] = Field(default_factory=list)
+
+
 class ShrimpDetailResponse(BaseModel):
     id: uuid.UUID
     name: str

@@ -10,11 +10,11 @@ from app.models.catalog import CatalogStatus
 from app.schemas.catalog import (
     CareParameterCreate,
     CatalogOptionsResponse,
+    OwnerShrimpListItemResponse,
     ShrimpCreate,
     ShrimpDetailResponse,
     ShrimpImageCreate,
     ShrimpImageUpdate,
-    ShrimpListItemResponse,
     ShrimpUpdate,
     ShrimpVariantCreate,
     ShrimpVariantUpdate,
@@ -29,7 +29,7 @@ from app.services.catalog import (
     edit_shrimp_variant,
     get_catalog_options,
     get_shrimp_catalog_item,
-    list_shrimp_catalog_items,
+    list_owner_shrimp_catalog_items,
     remove_shrimp_image,
     remove_shrimp_variant,
     set_shrimp_catalog_status,
@@ -50,7 +50,7 @@ async def get_owner_catalog_options(
     return await get_catalog_options(db, active_only=False)
 
 
-@router.get("/shrimp", response_model=list[ShrimpListItemResponse])
+@router.get("/shrimp", response_model=list[OwnerShrimpListItemResponse])
 async def list_owner_shrimp(
     catalog_status: CatalogStatus | None = Query(default=None),
     search: str | None = Query(default=None),
@@ -67,8 +67,8 @@ async def list_owner_shrimp(
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_roles("owner", "admin")),
-) -> list[ShrimpListItemResponse]:
-    return await list_shrimp_catalog_items(
+) -> list[OwnerShrimpListItemResponse]:
+    return await list_owner_shrimp_catalog_items(
         db,
         catalog_status=catalog_status.value if catalog_status else None,
         search=search,
